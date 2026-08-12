@@ -947,6 +947,7 @@ public final class CameraRecorderService extends Service
             }
         }
         enterForeground();
+        sendImpactNotification(gForce);
         publishState("충격 감지: " + String.format("%.1f", gForce) + "G - 녹화 시작");
     }
 
@@ -1411,17 +1412,22 @@ public final class CameraRecorderService extends Service
                             String.class,
                             CharSequence.class,
                             int.class);
-            Object channel = constructor.newInstance(
-                    CHANNEL_ID,
-                    "Camera recording",
-                    2);
             NotificationManager manager =
                     (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             Method method =
                     NotificationManager.class.getMethod(
                             "createNotificationChannel",
                             channelClass);
-            method.invoke(manager, channel);
+            // 녹화 채널 (IMPORTANCE_LOW = 2)
+            method.invoke(manager, constructor.newInstance(
+                    CHANNEL_ID,
+                    "Camera recording",
+                    2));
+            // 주차 감시 채널 (IMPORTANCE_HIGH = 4)
+            method.invoke(manager, constructor.newInstance(
+                    PARKING_CHANNEL_ID,
+                    "주차 감시",
+                    4));
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException("Cannot create notification channel", exception);
         }
@@ -1458,6 +1464,51 @@ public final class CameraRecorderService extends Service
 
     private void enterForeground() {
         startForeground(NOTIFICATION_ID, buildNotification());
+    }
+
+    private void sendImpactNotification(float gForce) {
+        createNotificationChannel();
+        try {
+            Intent activityIntent = new Intent(this, MainActivity.class);
+            PendingIntent pendingIntent = PendingIntent.getActivity(
+                    this,
+                    1,
+                    activityIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT);
+            Notification.Builder builder = createParkingNotificationBuilder();
+            Notification notification = builder
+                    .setSmallIcon(R.drawable.ic_record)
+                    .setContentTitle("충격 감지!")
+                    .setContentText(
+                            String.format("%.1f", gForce)
+                                    + "G 충격이 감지되어 녹화를 시작했습니다")
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(true)
+                    .setCategory(Notification.CATEGORY_EVENT)
+                    .build();
+            NotificationManager nm =
+                    (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                nm.notify(PARKING_NOTIFICATION_ID, notification);
+            }
+        } catch (Exception exception) {
+            Log.w(TAG, "Impact notification failed", exception);
+        }
+    }
+
+    private Notification.Builder createParkingNotificationBuilder() {
+        if (Build.VERSION.SDK_INT < 26) {
+            return new Notification.Builder(this);
+        }
+        try {
+            Constructor<Notification.Builder> constructor =
+                    Notification.Builder.class.getConstructor(
+                            Context.class,
+                            String.class);
+            return constructor.newInstance(this, PARKING_CHANNEL_ID);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Cannot create parking notification", exception);
+        }
     }
 
     private void publishState(final String message) {

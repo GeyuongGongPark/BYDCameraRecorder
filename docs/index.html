@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BYD 블랙박스 — BYD 차량용 블랙박스 앱</title>
+  <meta name="description" content="BYD 차량 내장 카메라를 활용한 안드로이드 블랙박스 앱. GPS 속도 오버레이, 주차 감시 모드, 4채널 360° 녹화 지원." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #050b14;
+      --surface:  #0d1829;
+      --border:   #1a2f4a;
+      --accent:   #3dc8ff;
+      --accent2:  #00e5a0;
+      --danger:   #ff6b6b;
+      --text:     #f0f4fa;
+      --muted:    #7a92b0;
+      --card-bg:  #0a1525;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 max(24px, 5vw);
+      height: 60px;
+      background: rgba(5, 11, 20, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-brand .cam-icon {
+      width: 28px; height: 28px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .nav-brand .cam-icon svg { width: 16px; height: 16px; fill: var(--bg); }
+    .nav-links { display: flex; gap: 28px; list-style: none; }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--accent); }
+    .nav-cta {
+      background: var(--accent);
+      color: var(--bg);
+      padding: 7px 18px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: opacity .2s;
+    }
+    .nav-cta:hover { opacity: .85; }
+
+    /* ── SECTIONS ── */
+    section { padding: 80px max(24px, 6vw); }
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 88vh;
+      display: flex;
+      align-items: center;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(61,200,255,.12), transparent),
+        radial-gradient(ellipse 60% 50% at 80% 60%, rgba(0,229,160,.07), transparent);
+      padding-top: 40px;
+    }
+    .hero-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(61,200,255,.1);
+      border: 1px solid rgba(61,200,255,.25);
+      color: var(--accent);
+      border-radius: 99px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      margin-bottom: 18px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .hero-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+    h1 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 18px;
+    }
+    h1 span { color: var(--accent); }
+    .hero-desc {
+      font-size: 1.05rem;
+      color: var(--muted);
+      margin-bottom: 36px;
+      max-width: 480px;
+    }
+    .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: var(--bg);
+      padding: 12px 26px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: opacity .2s, transform .15s;
+    }
+    .btn-primary:hover { opacity: .88; transform: translateY(-1px); }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      color: var(--text);
+      padding: 12px 26px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: border-color .2s, background .2s;
+    }
+    .btn-secondary:hover { border-color: var(--accent); background: rgba(61,200,255,.06); }
+
+    /* hero visual */
+    .hero-visual {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .cam-cell {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      aspect-ratio: 4/3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      position: relative;
+      overflow: hidden;
+    }
+    .cam-cell::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, rgba(61,200,255,.05) 0%, transparent 70%);
+    }
+    .cam-cell svg { width: 32px; height: 32px; opacity: .4; }
+    .cam-cell .cam-label {
+      font-weight: 600;
+      color: var(--text);
+      font-size: 0.82rem;
+    }
+    .cam-cell .speed-badge {
+      position: absolute;
+      bottom: 8px; right: 8px;
+      background: rgba(0,0,0,.75);
+      color: var(--accent2);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .cam-combined {
+      grid-column: 1 / -1;
+      aspect-ratio: 2/1;
+    }
+
+    /* ── FEATURES ── */
+    .section-tag {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 10px;
+    }
+    h2 {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+    .section-sub {
+      color: var(--muted);
+      font-size: 1rem;
+      max-width: 560px;
+      margin-bottom: 56px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+      transition: border-color .2s, transform .15s;
+    }
+    .feature-card:hover {
+      border-color: rgba(61,200,255,.35);
+      transform: translateY(-2px);
+    }
+    .feature-icon {
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 18px;
+      font-size: 1.3rem;
+    }
+    .icon-blue  { background: rgba(61,200,255,.12); }
+    .icon-green { background: rgba(0,229,160,.12); }
+    .icon-red   { background: rgba(255,107,107,.12); }
+    .icon-purple{ background: rgba(167,139,250,.12); }
+    .feature-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+    .feature-card p  { font-size: 0.9rem; color: var(--muted); line-height: 1.65; }
+
+    /* ── HOW IT WORKS ── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 0;
+      position: relative;
+    }
+    .steps::before {
+      content: '';
+      position: absolute;
+      top: 28px;
+      left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border) 15%, var(--border) 85%, transparent);
+    }
+    .step {
+      padding: 0 24px 0 0;
+      position: relative;
+    }
+    .step-num {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      font-size: 1.1rem;
+      font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 18px;
+      position: relative;
+      z-index: 1;
+    }
+    .step h3 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+    .step p  { font-size: 0.88rem; color: var(--muted); }
+
+    /* ── SPECS ── */
+    .specs-bg { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .specs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 32px;
+    }
+    .spec-item { }
+    .spec-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 6px;
+    }
+    .spec-value {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .spec-value span { color: var(--accent); }
+
+    /* ── COMPAT ── */
+    .compat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .compat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .compat-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-green  { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
+    .dot-yellow { background: #fbbf24; }
+    .dot-muted  { background: var(--muted); }
+    .compat-card h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 2px; }
+    .compat-card p  { font-size: 0.8rem; color: var(--muted); }
+
+    /* ── CTA ── */
+    .cta-section {
+      background:
+        radial-gradient(ellipse 70% 80% at 50% 50%, rgba(61,200,255,.08), transparent);
+      text-align: center;
+    }
+    .cta-section h2 { margin-bottom: 14px; }
+    .cta-section p  { color: var(--muted); margin-bottom: 36px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .cta-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px max(24px, 6vw);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    footer p { font-size: 0.85rem; color: var(--muted); }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--accent); }
+    .footer-links { display: flex; gap: 24px; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .hero-inner { grid-template-columns: 1fr; gap: 48px; }
+      .hero-visual { display: none; }
+      .steps::before { display: none; }
+      .step { padding: 0; }
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-brand" href="#">
+    <span class="cam-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+    </span>
+    BYD 블랙박스
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">기능</a></li>
+    <li><a href="#how">사용법</a></li>
+    <li><a href="#specs">사양</a></li>
+    <li><a href="#compat">호환 차종</a></li>
+  </ul>
+  <a class="nav-cta" href="https://github.com/GeyuongGongPark/BYDCameraRecorder/releases" target="_blank">다운로드</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-content">
+      <div class="hero-badge">BYD Android 블랙박스</div>
+      <h1>차량 내장 카메라로<br/><span>완전한 블랙박스</span>를</h1>
+      <p class="hero-desc">
+        BYD 차량의 내장 AVM 카메라를 활용한 무설치 블랙박스 앱.
+        4채널 360° 영상 녹화, GPS 속도 오버레이, 주차 감시 모드를 지원합니다.
+      </p>
+      <div class="hero-actions">
+        <a class="btn-primary" href="https://github.com/GeyuongGongPark/BYDCameraRecorder/releases" target="_blank">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+          APK 다운로드
+        </a>
+        <a class="btn-secondary" href="https://github.com/GeyuongGongPark/BYDCameraRecorder" target="_blank">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.71-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.03A9.56 9.56 0 0 1 12 6.8c.85.004 1.71.11 2.51.33 1.91-1.3 2.75-1.03 2.75-1.03.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85 0 1.34-.01 2.41-.01 2.74 0 .27.18.58.69.48A10 10 0 0 0 22 12 10 10 0 0 0 12 2z"/></svg>
+          GitHub 소스
+        </a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="cam-cell">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M4 12V8a2 2 0 0 1 2-2h1l2-2h6l2 2h1a2 2 0 0 1 2 2v4"/></svg>
+        <span class="cam-label">전방</span>
+        <span class="speed-badge">72 km/h</span>
+      </div>
+      <div class="cam-cell">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M4 12V8a2 2 0 0 1 2-2h1l2-2h6l2 2h1a2 2 0 0 1 2 2v4"/></svg>
+        <span class="cam-label">후방</span>
+        <span class="speed-badge">72 km/h</span>
+      </div>
+      <div class="cam-cell">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M4 12V8a2 2 0 0 1 2-2h1l2-2h6l2 2h1a2 2 0 0 1 2 2v4"/></svg>
+        <span class="cam-label">좌측</span>
+        <span class="speed-badge">72 km/h</span>
+      </div>
+      <div class="cam-cell">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M4 12V8a2 2 0 0 1 2-2h1l2-2h6l2 2h1a2 2 0 0 1 2 2v4"/></svg>
+        <span class="cam-label">우측</span>
+        <span class="speed-badge">72 km/h</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="section-tag">핵심 기능</div>
+    <h2>블랙박스에 필요한 모든 것</h2>
+    <p class="section-sub">별도 장치 없이 BYD 내장 카메라만으로 전방위 블랙박스를 구현합니다.</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon icon-blue">🎥</div>
+        <h3>4채널 360° 녹화</h3>
+        <p>전·후·좌·우 4개 카메라를 동시에 H.264 MP4로 녹화합니다. 개별 영상과 2×2 합성 영상을 함께 저장합니다.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-green">📍</div>
+        <h3>GPS 속도 오버레이</h3>
+        <p>영상에 현재 속도(km/h·mph 선택)를 직접 새겨 넣습니다. GPX 트랙 파일도 함께 저장되어 경로 재생이 가능합니다.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-red">🛡️</div>
+        <h3>주차 감시 모드</h3>
+        <p>가속도계로 충격을 감지(기본 2.5G)하면 즉시 녹화를 시작합니다. 해당 세그먼트를 자동으로 잠금 처리해 덮어쓰기를 방지합니다.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-purple">🔄</div>
+        <h3>연속 루프 녹화</h3>
+        <p>세그먼트(기본 3분) 단위로 순환 녹화합니다. 용량 한도에 도달하면 오래된 영상부터 자동으로 삭제합니다.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-blue">📱</div>
+        <h3>폰 앱 원격 접속</h3>
+        <p>같은 Wi-Fi 네트워크의 스마트폰에서 실시간 프리뷰 확인과 영상 다운로드가 가능합니다.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-green">⚡</div>
+        <h3>차량 시동 시 자동 시작</h3>
+        <p>BOOT_COMPLETED 브로드캐스트를 수신해 차량 켜지면 자동으로 녹화를 시작합니다. 별도 조작이 필요 없습니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" style="background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+  <div class="container">
+    <div class="section-tag">사용 방법</div>
+    <h2>설치부터 녹화까지 3단계</h2>
+    <p class="section-sub">별도 하드웨어 설치 없이 APK 설치만으로 바로 사용할 수 있습니다.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>APK 설치</h3>
+        <p>Releases 페이지에서 최신 APK를 다운로드하여 차량 인포테인먼트 시스템에 설치합니다.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>카메라 권한 허용</h3>
+        <p>앱 최초 실행 시 카메라 및 위치 권한을 허용합니다. 저장 경로와 녹화 시간 등을 설정합니다.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>자동 녹화 시작</h3>
+        <p>차량 시동을 켜면 자동으로 녹화가 시작됩니다. 주차 후 감시 모드를 켜면 충격 감지 시 자동 녹화됩니다.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <h3>영상 확인</h3>
+        <p>앱 내 녹화 목록에서 재생하거나 폰 앱으로 Wi-Fi 전송해 확인합니다. 잠금 설정으로 덮어쓰기를 방지하세요.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SPECS -->
+<section id="specs" class="specs-bg">
+  <div class="container">
+    <div class="section-tag">기술 사양</div>
+    <h2>앱 스펙</h2>
+    <p class="section-sub" style="margin-bottom: 40px;">BYD 차량 내장 AVMCamera API 기반으로 구현되었습니다.</p>
+    <div class="specs-grid">
+      <div class="spec-item">
+        <div class="spec-label">카메라 수</div>
+        <div class="spec-value"><span>4</span>채널 동시 녹화</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">소스 해상도</div>
+        <div class="spec-value">5120 × 960 <span>NV21</span></div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">인코딩</div>
+        <div class="spec-value"><span>H.264</span> AVC MP4</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">프레임레이트</div>
+        <div class="spec-value"><span>30</span> fps</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">세그먼트 길이</div>
+        <div class="spec-value"><span>1–10</span>분 설정 가능</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">GPS 트랙</div>
+        <div class="spec-value"><span>GPX 1.1</span> 형식</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">충격 임계값</div>
+        <div class="spec-value"><span>1.5–5.0G</span> 설정 가능</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">최소 Android</div>
+        <div class="spec-value">API <span>23</span> (6.0)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPAT -->
+<section id="compat">
+  <div class="container">
+    <div class="section-tag">호환 차종</div>
+    <h2>지원 차량</h2>
+    <p class="section-sub">BYD AVMCamera API를 사용하는 차량에서 동작합니다. 추가 차종 커뮤니티 기여를 환영합니다.</p>
+    <div class="compat-cards">
+      <div class="compat-card">
+        <span class="compat-dot dot-green"></span>
+        <div>
+          <h4>BYD Atto 3</h4>
+          <p>완전 지원 · 테스트 완료</p>
+        </div>
+      </div>
+      <div class="compat-card">
+        <span class="compat-dot dot-yellow"></span>
+        <div>
+          <h4>BYD Seal</h4>
+          <p>호환 예상 · 미검증</p>
+        </div>
+      </div>
+      <div class="compat-card">
+        <span class="compat-dot dot-yellow"></span>
+        <div>
+          <h4>BYD Han</h4>
+          <p>호환 예상 · 미검증</p>
+        </div>
+      </div>
+      <div class="compat-card">
+        <span class="compat-dot dot-yellow"></span>
+        <div>
+          <h4>BYD Tang</h4>
+          <p>호환 예상 · 미검증</p>
+        </div>
+      </div>
+      <div class="compat-card">
+        <span class="compat-dot dot-muted"></span>
+        <div>
+          <h4>기타 BYD 차량</h4>
+          <p>AVMCamera API 탑재 시 동작 가능</p>
+        </div>
+      </div>
+      <div class="compat-card" style="border-style: dashed; opacity: .6;">
+        <span class="compat-dot dot-muted"></span>
+        <div>
+          <h4>차종 추가 기여</h4>
+          <p>GitHub Issue 또는 PR 환영</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container">
+    <div class="section-tag" style="text-align:center">오픈소스</div>
+    <h2>지금 바로 시작하세요</h2>
+    <p>무료 오픈소스 프로젝트입니다. APK를 설치하거나 소스 코드를 포크해 커스터마이즈할 수 있습니다.</p>
+    <div class="cta-actions">
+      <a class="btn-primary" href="https://github.com/GeyuongGongPark/BYDCameraRecorder/releases" target="_blank">
+        APK 다운로드
+      </a>
+      <a class="btn-secondary" href="https://github.com/GeyuongGongPark/BYDCameraRecorder" target="_blank">
+        GitHub에서 보기
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2025 BYD 블랙박스 · MIT License · <a href="https://github.com/GeyuongGongPark/BYDCameraRecorder" target="_blank">GitHub</a></p>
+  <div class="footer-links">
+    <a href="https://github.com/GeyuongGongPark/BYDCameraRecorder/issues" target="_blank">버그 신고</a>
+    <a href="https://github.com/GeyuongGongPark/BYDCameraRecorder/blob/main/README.md" target="_blank">README</a>
+  </div>
+</footer>
+
+</body>
+</html>

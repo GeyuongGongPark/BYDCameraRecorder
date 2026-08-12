@@ -180,6 +180,8 @@ public final class MainActivity extends Activity
     private NumericStepper retentionStepper;
     private NumericStepper segmentStepper;
     private NumericStepper minFreeStepper;
+    private NumericStepper parkingImpactStepper;
+    private NumericStepper parkingDurationStepper;
     private StyledSlider fisheyeCropSlider;
     private TextView fisheyeCropValueView;
     private LinearLayout segmentList;
@@ -1222,6 +1224,45 @@ public final class MainActivity extends Activity
                 matchWidthWrap(dp(0), dp(10)));
         fields.addView(
                 labeledField("Minimum volume free", minFreeStepper),
+                matchWidthWrap(dp(0), dp(10)));
+
+        fields.addView(
+                sectionTitleWithHelp(
+                        "주차 감시 설정",
+                        "충격이 감지되면 자동으로 녹화를 시작합니다. "
+                                + "임계값이 낮을수록 작은 충격도 감지되며, "
+                                + "녹화 시간은 충격 감지 후 계속 녹화하는 시간입니다."),
+                matchWidthWrap(dp(0), dp(8)));
+        // 임계값은 0.5G 단위, 1.5G~5.0G → 스텝 값 = G*10 (15~50, step 5)
+        parkingImpactStepper = numericStepper(
+                new NumericStepper.Specification(
+                        "충격 임계값",
+                        15,  // 1.5G
+                        50,  // 5.0G
+                        5,   // 0.5G 단위
+                        new NumericStepper.ValueFormatter() {
+                            @Override
+                            public String format(int value) {
+                                return (value / 10.0f) + "G";
+                            }
+                        }));
+        parkingDurationStepper = numericStepper(
+                new NumericStepper.Specification(
+                        "녹화 시간",
+                        ParkingGuardSettings.MIN_RECORDING_SECONDS,
+                        ParkingGuardSettings.MAX_RECORDING_SECONDS,
+                        30,
+                        new NumericStepper.ValueFormatter() {
+                            @Override
+                            public String format(int value) {
+                                return value + "초";
+                            }
+                        }));
+        fields.addView(
+                labeledField("충격 임계값", parkingImpactStepper),
+                matchWidthWrap(dp(0), dp(10)));
+        fields.addView(
+                labeledField("충격 후 녹화 시간", parkingDurationStepper),
                 matchWidthWrap(dp(0), dp(10)));
         scroll.addView(fields);
         panel.addView(
@@ -3199,6 +3240,13 @@ public final class MainActivity extends Activity
         retentionStepper.setValue(settings.retentionDays);
         segmentStepper.setValue(settings.segmentMinutes);
         minFreeStepper.setValue(settings.minFreePercent);
+        if (parkingImpactStepper != null) {
+            parkingImpactStepper.setValue(
+                    Math.round(settings.parkingImpactThresholdG * 10));
+        }
+        if (parkingDurationStepper != null) {
+            parkingDurationStepper.setValue(settings.parkingRecordingSeconds);
+        }
         for (int index = 0; index < cameraNameInputs.length; index++) {
             if (cameraNameInputs[index] != null) {
                 cameraNameInputs[index].setText(settings.cameraName(index));
@@ -3343,7 +3391,10 @@ public final class MainActivity extends Activity
                         left.cameraFlipVertical(),
                         right.cameraFlipVertical())
                 && left.fisheyeCropPercent()
-                        == right.fisheyeCropPercent();
+                        == right.fisheyeCropPercent()
+                && Math.round(left.parkingImpactThresholdG * 10)
+                        == Math.round(right.parkingImpactThresholdG * 10)
+                && left.parkingRecordingSeconds == right.parkingRecordingSeconds;
     }
 
     private void refreshStorage() {
@@ -4118,6 +4169,14 @@ public final class MainActivity extends Activity
                     fisheyeCropSlider == null
                             ? settings.fisheyeCropPercent()
                             : fisheyeCropSlider.getValue();
+            float parkingImpactThresholdG =
+                    parkingImpactStepper != null
+                            ? parkingImpactStepper.getValue() / 10.0f
+                            : settings.parkingImpactThresholdG;
+            int parkingRecordingSeconds =
+                    parkingDurationStepper != null
+                            ? parkingDurationStepper.getValue()
+                            : settings.parkingRecordingSeconds;
             return new RecorderSettings(
                     volumeIndex,
                     quotaBytes,
@@ -4143,8 +4202,8 @@ public final class MainActivity extends Activity
                     settings.gpsSpeedUnit,
                     settings.gpsShowCoordinates,
                     settings.gpsTrackEnabled,
-                    settings.parkingImpactThresholdG,
-                    settings.parkingRecordingSeconds,
+                    parkingImpactThresholdG,
+                    parkingRecordingSeconds,
                     settings.parkingAutoLock);
         } catch (NumberFormatException exception) {
             if (showErrors) {
