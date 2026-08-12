@@ -47,6 +47,8 @@ public final class SegmentRecorder {
     private long chunkStartedNanos;
     private volatile RecorderSettings settings;
     private boolean started;
+    private final GpxTrackWriter gpxTrackWriter = new GpxTrackWriter();
+    private volatile GpsFix latestGpsFix = GpsFix.UNAVAILABLE;
 
     public SegmentRecorder(StorageRepository storageRepository, Listener listener) {
         this.storageRepository = storageRepository;
@@ -116,6 +118,11 @@ public final class SegmentRecorder {
         started = true;
     }
 
+    /** GPS fix를 업데이트합니다. CameraRecorderService에서 GPS 콜백 시 호출. */
+    public void updateGpsFix(GpsFix fix) {
+        latestGpsFix = fix != null ? fix : GpsFix.UNAVAILABLE;
+    }
+
     public void offerFrame(FrameProcessor.ProcessedFrame frame) throws IOException {
         if (!started) {
             return;
@@ -137,6 +144,10 @@ public final class SegmentRecorder {
         }
         encoders.get(FrameProcessor.CAMERA_COUNT)
                 .encodeNv21(frame.combined, presentationTimeUs);
+        // GPX 궤적 기록 (gpsTrackEnabled 설정 시)
+        if (settings.gpsTrackEnabled) {
+            gpxTrackWriter.offerFix(latestGpsFix, System.currentTimeMillis());
+        }
     }
 
     public void stop() {
@@ -157,6 +168,8 @@ public final class SegmentRecorder {
     }
 
     private void closeActiveSegment(boolean completed) {
+        // GPX 파일 먼저 닫기 (activeDirectory 유효한 동안)
+        gpxTrackWriter.close(activeDirectory);
         boolean allFinalized = completed && !encoders.isEmpty();
         for (AvcMp4Encoder encoder : encoders) {
             try {
@@ -324,6 +337,14 @@ public final class SegmentRecorder {
         encoders = openedEncoders;
         segmentStartedNanos = System.nanoTime();
         chunkStartedNanos = segmentStartedNanos;
+        // GPX 궤적 파일 열기
+        if (settings.gpsTrackEnabled) {
+            try {
+                gpxTrackWriter.open(activeDirectory);
+            } catch (IOException exception) {
+                Log.w(TAG, "GPX file open failed, GPS track will not be saved", exception);
+            }
+        }
         listener.onRecorderState(
                 "Recording "
                         + RecorderDateTime.formatSegmentName(

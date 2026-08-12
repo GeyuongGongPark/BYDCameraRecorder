@@ -173,6 +173,8 @@ public final class CameraRecorderService extends Service
     private PowerManager.WakeLock wakeLock;
     private volatile boolean segmentRecoveryLoopRunning;
     private volatile long uiStateVersion = 1L;
+    private GpsDataProvider gpsDataProvider;
+    private GpsOverlayRenderer gpsOverlayRenderer;
 
     @Override
     public void onCreate() {
@@ -188,6 +190,7 @@ public final class CameraRecorderService extends Service
                 "BYDCamera:Recording");
         wakeLock.setReferenceCounted(false);
         applyPhoneAccessSetting(RecorderSettings.load(this));
+        startGps(RecorderSettings.load(this));
         startSegmentRecoveryLoop();
     }
 
@@ -286,6 +289,7 @@ public final class CameraRecorderService extends Service
     @Override
     public void onDestroy() {
         segmentRecoveryLoopRunning = false;
+        stopGps();
         shutdown();
         closePhonePreviewWorker();
         super.onDestroy();
@@ -776,6 +780,7 @@ public final class CameraRecorderService extends Service
 
     public synchronized void applyRecorderSettings(RecorderSettings settings) {
         applyPhoneAccessSetting(settings);
+        applyGpsSettings(settings);
         if (mode == Mode.RECORDING) {
             // Segment length and storage policy changes take effect on the
             // running recording instead of waiting for a restart.
@@ -794,6 +799,46 @@ public final class CameraRecorderService extends Service
                     settings.cameraFlipVertical(),
                     settings.fisheyeCropPercent());
         }
+    }
+
+    private void startGps(RecorderSettings settings) {
+        gpsDataProvider = new GpsDataProvider();
+        gpsDataProvider.setListener(new GpsDataProvider.Listener() {
+            @Override
+            public void onFixUpdated(GpsFix fix) {
+                onGpsFixUpdated(fix);
+            }
+        });
+        gpsDataProvider.start(this);
+        applyGpsSettings(settings);
+    }
+
+    private void stopGps() {
+        if (gpsDataProvider != null) {
+            gpsDataProvider.stop();
+            gpsDataProvider = null;
+        }
+        gpsOverlayRenderer = null;
+        frameProcessor.setGpsOverlayRenderer(null);
+    }
+
+    private void applyGpsSettings(RecorderSettings settings) {
+        if (gpsOverlayRenderer == null) {
+            gpsOverlayRenderer = new GpsOverlayRenderer(
+                    settings.gpsOverlayEnabled,
+                    "kmh".equals(settings.gpsSpeedUnit),
+                    settings.gpsShowCoordinates);
+            frameProcessor.setGpsOverlayRenderer(gpsOverlayRenderer);
+        } else {
+            gpsOverlayRenderer.setEnabled(settings.gpsOverlayEnabled);
+            gpsOverlayRenderer.setUseKmh("kmh".equals(settings.gpsSpeedUnit));
+            gpsOverlayRenderer.setShowCoordinates(settings.gpsShowCoordinates);
+        }
+    }
+
+    private void onGpsFixUpdated(GpsFix fix) {
+        frameProcessor.updateGpsFix(fix);
+        segmentRecorder.updateGpsFix(fix);
     }
 
     public synchronized String regeneratePhoneAccessPin() {
@@ -936,7 +981,11 @@ public final class CameraRecorderService extends Service
                         json,
                         "fisheyeCropPercent",
                         current.fisheyeCropPercent()),
-                current.vehicleModelId);
+                current.vehicleModelId,
+                current.gpsOverlayEnabled,
+                current.gpsSpeedUnit,
+                current.gpsShowCoordinates,
+                current.gpsTrackEnabled);
         updated.save(this);
         applyRecorderSettings(updated);
         publishSettingsChanged();

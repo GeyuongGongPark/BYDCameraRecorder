@@ -4094,7 +4094,11 @@ public final class MainActivity extends Activity
                     cameraFlipHorizontal,
                     cameraFlipVertical,
                     fisheyeCropPercent,
-                    settings.vehicleModelId);
+                    settings.vehicleModelId,
+                    settings.gpsOverlayEnabled,
+                    settings.gpsSpeedUnit,
+                    settings.gpsShowCoordinates,
+                    settings.gpsTrackEnabled);
         } catch (NumberFormatException exception) {
             if (showErrors) {
                 showMessage("Enter valid numeric storage settings");

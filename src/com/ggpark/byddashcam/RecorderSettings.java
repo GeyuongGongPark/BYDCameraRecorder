@@ -33,6 +33,10 @@ public final class RecorderSettings {
     private static final String KEY_SEGMENT_MINUTES = "segment_minutes";
     private static final String KEY_VEHICLE_MODEL_ID = "vehicle_model_id";
     private static final String KEY_VOLUME_INDEX = "volume_index";
+    private static final String KEY_GPS_OVERLAY_ENABLED = "gps_overlay_enabled";
+    private static final String KEY_GPS_SPEED_UNIT = "gps_speed_unit";
+    private static final String KEY_GPS_SHOW_COORDINATES = "gps_show_coordinates";
+    private static final String KEY_GPS_TRACK_ENABLED = "gps_track_enabled";
 
     public static final int DEFAULT_FISHEYE_CROP_PERCENT = 15;
     public static final int DEFAULT_MIN_FREE_PERCENT = 5;
@@ -70,6 +74,10 @@ public final class RecorderSettings {
     public final int segmentMinutes;
     public final String vehicleModelId;
     public final int volumeIndex;
+    public final boolean gpsOverlayEnabled;
+    public final String gpsSpeedUnit;
+    public final boolean gpsShowCoordinates;
+    public final boolean gpsTrackEnabled;
 
     public RecorderSettings(
             int volumeIndex,
@@ -89,7 +97,11 @@ public final class RecorderSettings {
             boolean[] cameraFlipHorizontal,
             boolean[] cameraFlipVertical,
             int fisheyeCropPercent,
-            String vehicleModelId) {
+            String vehicleModelId,
+            boolean gpsOverlayEnabled,
+            String gpsSpeedUnit,
+            boolean gpsShowCoordinates,
+            boolean gpsTrackEnabled) {
         this.volumeIndex = Math.max(0, volumeIndex);
         this.quotaBytes = clampLong(
                 quotaBytes,
@@ -130,6 +142,10 @@ public final class RecorderSettings {
                         0,
                         MAX_CAMERA_CROP_PERCENT);
         this.vehicleModelId = vehicleModelId == null ? "" : vehicleModelId;
+        this.gpsOverlayEnabled = gpsOverlayEnabled;
+        this.gpsSpeedUnit = gpsSpeedUnit == null ? "kmh" : gpsSpeedUnit;
+        this.gpsShowCoordinates = gpsShowCoordinates;
+        this.gpsTrackEnabled = gpsTrackEnabled;
     }
 
     public static RecorderSettings load(Context context) {
@@ -167,7 +183,11 @@ public final class RecorderSettings {
                 loadCameraFlips(preferences, KEY_CAMERA_FLIP_HORIZONTAL_PREFIX),
                 loadCameraFlips(preferences, KEY_CAMERA_FLIP_VERTICAL_PREFIX),
                 loadFisheyeCropPercent(preferences),
-                preferences.getString(KEY_VEHICLE_MODEL_ID, ""));
+                preferences.getString(KEY_VEHICLE_MODEL_ID, ""),
+                preferences.getBoolean(KEY_GPS_OVERLAY_ENABLED, true),
+                preferences.getString(KEY_GPS_SPEED_UNIT, "kmh"),
+                preferences.getBoolean(KEY_GPS_SHOW_COORDINATES, false),
+                preferences.getBoolean(KEY_GPS_TRACK_ENABLED, true));
     }
 
     public void save(Context context) {
@@ -191,7 +211,11 @@ public final class RecorderSettings {
                 .putInt(
                         KEY_FISHEYE_CROP_PERCENT,
                         fisheyeCropPercent)
-                .putString(KEY_VEHICLE_MODEL_ID, vehicleModelId);
+                .putString(KEY_VEHICLE_MODEL_ID, vehicleModelId)
+                .putBoolean(KEY_GPS_OVERLAY_ENABLED, gpsOverlayEnabled)
+                .putString(KEY_GPS_SPEED_UNIT, gpsSpeedUnit)
+                .putBoolean(KEY_GPS_SHOW_COORDINATES, gpsShowCoordinates)
+                .putBoolean(KEY_GPS_TRACK_ENABLED, gpsTrackEnabled);
         for (int index = 0; index < cameraNames.length; index++) {
             editor.putString(KEY_CAMERA_NAME_PREFIX + index, cameraNames[index]);
             editor.putInt(
@@ -272,7 +296,11 @@ public final class RecorderSettings {
                 cameraFlipHorizontal,
                 cameraFlipVertical,
                 fisheyeCropPercent,
-                vehicleModelId);
+                vehicleModelId,
+                gpsOverlayEnabled,
+                gpsSpeedUnit,
+                gpsShowCoordinates,
+                gpsTrackEnabled);
     }
 
     public RecorderSettings withPhoneAccess(
@@ -297,7 +325,11 @@ public final class RecorderSettings {
                 cameraFlipHorizontal,
                 cameraFlipVertical,
                 fisheyeCropPercent,
-                vehicleModelId);
+                vehicleModelId,
+                gpsOverlayEnabled,
+                gpsSpeedUnit,
+                gpsShowCoordinates,
+                gpsTrackEnabled);
     }
 
     public RecorderSettings withPhoneAccessPin(String accessPin) {
@@ -319,7 +351,11 @@ public final class RecorderSettings {
                 cameraFlipHorizontal,
                 cameraFlipVertical,
                 fisheyeCropPercent,
-                vehicleModelId);
+                vehicleModelId,
+                gpsOverlayEnabled,
+                gpsSpeedUnit,
+                gpsShowCoordinates,
+                gpsTrackEnabled);
     }
 
     public RecorderSettings withVehicleModelId(String newModelId) {
@@ -341,7 +377,11 @@ public final class RecorderSettings {
                 cameraFlipHorizontal,
                 cameraFlipVertical,
                 fisheyeCropPercent,
-                newModelId);
+                newModelId,
+                gpsOverlayEnabled,
+                gpsSpeedUnit,
+                gpsShowCoordinates,
+                gpsTrackEnabled);
     }
 
     private static String defaultCameraName(int cameraIndex) {

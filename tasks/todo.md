@@ -7,12 +7,13 @@
 - [ ] 에뮬레이터에서 FixtureFrameSource 정상 동작 확인
 
 ## Phase 1: 모델 지원 확대
-- [ ] `VehicleProfile` interface 작성
-- [ ] `Atto3Profile` 구현 (기존 하드코딩 값 이전)
-- [ ] `GenericAvmProfile` 구현 (fallback)
-- [ ] `VehicleProfileRegistry` 작성 (Build.MODEL 기반 자동 감지)
-- [ ] `AvmCameraController` 리팩터링 (VehicleProfile 주입)
-- [ ] `FrameProcessor` 리팩터링 (상수 하드코딩 제거, profile 기반)
+- [x] `VehicleProfile` interface 작성
+- [x] `Atto3Profile` 구현 (기존 하드코딩 값 이전)
+- [x] `GenericAvmProfile` 구현 (fallback)
+- [x] `VehicleProfileRegistry` 작성 (Build.MODEL 기반 자동 감지)
+- [x] `AvmCameraController` 리팩터링 (VehicleProfile 주입)
+- [x] `FrameProcessor` 리팩터링 (상수 하드코딩 제거, profile 기반)
+- [x] `RecorderSettings`에 vehicleModelId 저장
 - [ ] 설정 화면에 모델 수동 선택 UI 추가
 - [ ] 모델 감지 실패 시 선택 다이얼로그 표시
 

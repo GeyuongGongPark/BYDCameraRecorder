@@ -101,6 +101,8 @@ public final class FrameProcessor {
     private int outputCameraHeight;
     private boolean[] cameraFlipHorizontal = new boolean[CAMERA_COUNT];
     private boolean[] cameraFlipVertical = new boolean[CAMERA_COUNT];
+    private GpsOverlayRenderer gpsOverlayRenderer;
+    private GpsFix currentGpsFix = GpsFix.UNAVAILABLE;
     private byte[] combinedFrame;
     private int[] combinedLayout = new int[]{0, 1, 2, 3};
     private byte[] flipScratch;
@@ -160,6 +162,14 @@ public final class FrameProcessor {
         return fisheyeCropPercent;
     }
 
+    public synchronized void setGpsOverlayRenderer(GpsOverlayRenderer renderer) {
+        this.gpsOverlayRenderer = renderer;
+    }
+
+    public synchronized void updateGpsFix(GpsFix fix) {
+        this.currentGpsFix = fix != null ? fix : GpsFix.UNAVAILABLE;
+    }
+
     public synchronized void configureTransforms(
             int[] requestedCombinedLayout,
             boolean[] requestedCameraFlipHorizontal,
@@ -217,6 +227,14 @@ public final class FrameProcessor {
                         cameraFrames[cameraIndex],
                         0,
                         flipScratch.length);
+            }
+            // GPS 오버레이 합성 (flip 이후 적용)
+            if (gpsOverlayRenderer != null) {
+                gpsOverlayRenderer.applyToNv21(
+                        cameraFrames[cameraIndex],
+                        outputCameraWidth,
+                        outputCameraHeight,
+                        currentGpsFix);
             }
         }
         composeCombined(
