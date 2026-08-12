@@ -47,6 +47,7 @@ public final class SegmentRecorder {
     private long chunkStartedNanos;
     private volatile RecorderSettings settings;
     private boolean started;
+    private boolean autoLockNextSegment;
     private final GpxTrackWriter gpxTrackWriter = new GpxTrackWriter();
     private volatile GpsFix latestGpsFix = GpsFix.UNAVAILABLE;
 
@@ -116,6 +117,27 @@ public final class SegmentRecorder {
         }
         openSegment();
         started = true;
+    }
+
+    /**
+     * 주차 감시 모드에서 충격 감지 시 호출.
+     * 현재 세그먼트를 종료하고 새 세그먼트를 즉시 시작합니다.
+     * autoLock=true 이면 새 세그먼트를 자동으로 잠금합니다.
+     */
+    public void rotateNow(boolean autoLock) throws IOException {
+        if (!started) {
+            return;
+        }
+        autoLockNextSegment = autoLock;
+        rotate();
+    }
+
+    /**
+     * 다음에 openSegment()가 호출될 때 자동으로 세그먼트를 잠금하도록 설정합니다.
+     * 주차 감시 모드에서 segmentRecorder가 아직 시작 전일 때 사용합니다.
+     */
+    public void setAutoLockForNextSegment() {
+        autoLockNextSegment = true;
     }
 
     /** GPS fix를 업데이트합니다. CameraRecorderService에서 GPS 콜백 시 호출. */
@@ -343,6 +365,16 @@ public final class SegmentRecorder {
                 gpxTrackWriter.open(activeDirectory);
             } catch (IOException exception) {
                 Log.w(TAG, "GPX file open failed, GPS track will not be saved", exception);
+            }
+        }
+        // 주차 감시 충격 세그먼트 자동 잠금
+        if (autoLockNextSegment) {
+            autoLockNextSegment = false;
+            try {
+                storageRepository.setLocked(settings, activeDirectory, true);
+                Log.i(TAG, "Parking segment auto-locked: " + activeDirectory.getName());
+            } catch (IOException exception) {
+                Log.e(TAG, "Parking segment lock failed", exception);
             }
         }
         listener.onRecorderState(

@@ -27,13 +27,14 @@
 - [ ] 설정: 오버레이 ON/OFF, 위치(4코너), 속도 단위(km/h·mph), 표시 항목 선택
 
 ## Phase 3: 주차 감시 모드
-- [ ] `ImpactDetector` 작성 (TYPE_ACCELEROMETER, G-force 계산, 데바운스)
-- [ ] `ParkingGuardController` 작성 (감시 상태 머신)
-- [ ] `CameraRecorderService`에 주차 모드 진입/해제 로직 추가
-- [ ] 충격 감지 → 녹화 시작 → 세그먼트 자동 잠금 파이프라인
-- [ ] 충격 감지 알림 (NotificationManager)
-- [ ] 주차 모드 UI (메인 화면에 토글 버튼)
-- [ ] 설정: 충격 임계값(G), 충격 후 녹화 시간(초)
+- [x] `ImpactDetector` 작성 (TYPE_ACCELEROMETER, G-force 계산, 데바운스)
+- [x] `ParkingGuardController` 작성 (감시 상태 머신)
+- [x] `CameraRecorderService`에 주차 모드 진입/해제 로직 추가
+- [x] 충격 감지 → 녹화 시작 → 세그먼트 자동 잠금 파이프라인
+- [x] 주차 모드 UI (메인 화면에 토글 버튼)
+- [x] `RecorderSettings`에 충격 임계값/녹화 시간/자동잠금 설정 키 추가
+- [ ] 충격 감지 알림 채널 분리 (현재 기존 채널 공유)
+- [ ] 설정 화면에 주차 감시 설정 UI (임계값 슬라이더, 녹화 시간)
 
 ## 검증
 - [ ] 각 Phase 완료 후 에뮬레이터에서 동작 확인

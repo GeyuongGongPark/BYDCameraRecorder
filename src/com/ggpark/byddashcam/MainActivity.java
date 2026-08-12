@@ -163,6 +163,7 @@ public final class MainActivity extends Activity
     private IconButton resetZoomButton;
     private IconButton settingsSaveButton;
     private IconStateToggle recordingToggle;
+    private IconStateToggle parkingToggle;
     private int selectedCameraIndex = -1;
     private boolean serviceBound;
     private TextView stateView;
@@ -275,10 +276,11 @@ public final class MainActivity extends Activity
     @Override
     protected void onStart() {
         super.onStart();
-        if (recorderService != null
-                && recorderService.getMode()
-                == CameraRecorderService.Mode.NOT_RECORDING) {
-            recorderService.startPreview();
+        if (recorderService != null) {
+            CameraRecorderService.Mode m = recorderService.getMode();
+            if (m == CameraRecorderService.Mode.NOT_RECORDING) {
+                recorderService.startPreview();
+            }
         }
         refreshDirectPreviewTextures();
         nativePreviewWatchdogHandler.removeCallbacks(nativePreviewWatchdog);
@@ -291,10 +293,11 @@ public final class MainActivity extends Activity
     protected void onStop() {
         super.onStop();
         nativePreviewWatchdogHandler.removeCallbacks(nativePreviewWatchdog);
-        if (recorderService != null
-                && recorderService.getMode()
-                == CameraRecorderService.Mode.NOT_RECORDING) {
-            recorderService.releasePreview();
+        if (recorderService != null) {
+            CameraRecorderService.Mode m = recorderService.getMode();
+            if (m == CameraRecorderService.Mode.NOT_RECORDING) {
+                recorderService.releasePreview();
+            }
         }
     }
 
@@ -372,10 +375,17 @@ public final class MainActivity extends Activity
                 || settingsOverlay.getVisibility() != View.VISIBLE) {
             settings = RecorderSettings.load(this);
         }
-        stateView.setText(
-                mode == CameraRecorderService.Mode.RECORDING
-                        ? "RECORDING — " + message
-                        : "NOT RECORDING — " + message);
+        String statePrefix;
+        if (mode == CameraRecorderService.Mode.RECORDING) {
+            statePrefix = "RECORDING";
+        } else if (mode == CameraRecorderService.Mode.PARKING_STANDBY) {
+            statePrefix = "주차 감시 대기";
+        } else if (mode == CameraRecorderService.Mode.PARKING_RECORDING) {
+            statePrefix = "주차 감시 녹화";
+        } else {
+            statePrefix = "NOT RECORDING";
+        }
+        stateView.setText(statePrefix + " — " + message);
         updateRecordingControls(mode);
         refreshStorage();
     }
@@ -575,6 +585,33 @@ public final class MainActivity extends Activity
         actions.addView(
                 recordingToggle,
                 new LinearLayout.LayoutParams(dp(100), dp(58)));
+
+        parkingToggle = new IconStateToggle(
+                this,
+                R.drawable.ic_parking,
+                R.drawable.ic_parking,
+                "주차 감시 시작",
+                "주차 감시 중 - 탭하여 종료");
+        parkingToggle.setListener(
+                new IconStateToggle.Listener() {
+                    @Override
+                    public void onToggleRequested(boolean parking) {
+                        if (recorderService == null) {
+                            return;
+                        }
+                        if (parking) {
+                            if (checkCameraPermission()) {
+                                recorderService.enterParkingMode();
+                            }
+                        } else {
+                            recorderService.exitParkingMode();
+                        }
+                    }
+                });
+        LinearLayout.LayoutParams parkingParams =
+                new LinearLayout.LayoutParams(dp(100), dp(58));
+        parkingParams.leftMargin = dp(8);
+        actions.addView(parkingToggle, parkingParams);
 
         backgroundAccessButton = iconButton(
                 R.drawable.ic_background_recording,
@@ -3024,7 +3061,14 @@ public final class MainActivity extends Activity
             return;
         }
         boolean recording = mode == CameraRecorderService.Mode.RECORDING;
+        boolean parking = mode == CameraRecorderService.Mode.PARKING_STANDBY
+                || mode == CameraRecorderService.Mode.PARKING_RECORDING;
         recordingToggle.setChecked(recording);
+        recordingToggle.setEnabled(!parking);
+        if (parkingToggle != null) {
+            parkingToggle.setChecked(parking);
+            parkingToggle.setEnabled(!recording);
+        }
     }
 
     private void setControlsColumnCollapsed(final boolean collapsed) {
@@ -4098,7 +4142,10 @@ public final class MainActivity extends Activity
                     settings.gpsOverlayEnabled,
                     settings.gpsSpeedUnit,
                     settings.gpsShowCoordinates,
-                    settings.gpsTrackEnabled);
+                    settings.gpsTrackEnabled,
+                    settings.parkingImpactThresholdG,
+                    settings.parkingRecordingSeconds,
+                    settings.parkingAutoLock);
         } catch (NumberFormatException exception) {
             if (showErrors) {
                 showMessage("Enter valid numeric storage settings");

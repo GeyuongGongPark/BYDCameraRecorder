@@ -45,7 +45,9 @@ public final class CameraRecorderService extends Service
 
     public enum Mode {
         NOT_RECORDING,
-        RECORDING
+        RECORDING,
+        PARKING_STANDBY,    // 주차 감시 대기 중 (충격 감지 대기)
+        PARKING_RECORDING   // 충격 감지 후 녹화 중
     }
 
     public interface UiListener {
@@ -62,7 +64,9 @@ public final class CameraRecorderService extends Service
 
     public static final String EXTRA_STARTUP_REASON = "startup_reason";
     private static final String CHANNEL_ID = "byd_camera_recording";
+    private static final String PARKING_CHANNEL_ID = "byd_parking_guard";
     private static final int NOTIFICATION_ID = 48;
+    private static final int PARKING_NOTIFICATION_ID = 49;
     private static final long PHONE_PREVIEW_GRACE_MILLIS = 5000L;
     private static final long PHONE_PREVIEW_WAIT_MILLIS = 10_000L;
     // Quality 75 halves the bytes per frame versus 90 with little visible
@@ -175,6 +179,7 @@ public final class CameraRecorderService extends Service
     private volatile long uiStateVersion = 1L;
     private GpsDataProvider gpsDataProvider;
     private GpsOverlayRenderer gpsOverlayRenderer;
+    private ParkingGuardController parkingGuardController;
 
     @Override
     public void onCreate() {
@@ -600,6 +605,10 @@ public final class CameraRecorderService extends Service
         RecorderSettings.load(this)
                 .withContinuousRecordingEnabled(false)
                 .save(this);
+        if (mode == Mode.PARKING_STANDBY || mode == Mode.PARKING_RECORDING) {
+            exitParkingMode();
+            return;
+        }
         if (mode != Mode.RECORDING) {
             publishState("Not recording");
             return;
@@ -626,12 +635,16 @@ public final class CameraRecorderService extends Service
                 currentUiListener != null
                         && frameSource instanceof AvmCameraController;
         boolean recordingFrameDue =
-                currentMode == Mode.RECORDING
+                (currentMode == Mode.RECORDING || currentMode == Mode.PARKING_RECORDING)
                         && (lastRecordedFrameNanos == 0L
                                 || rawFrame.monotonicNanos
                                         - lastRecordedFrameNanos
                                         >= RECORD_INTERVAL_NANOS);
-        if (!previewRequested && !recordingFrameDue && !nativeCarPreviewPossible) {
+        // 주차 감시 대기 중에는 카메라를 열어 둬야 합니다 (충격 감지 후 즉시 녹화를 위해).
+        boolean keepCameraOpen = currentMode == Mode.PARKING_STANDBY
+                || currentMode == Mode.PARKING_RECORDING;
+        if (!previewRequested && !recordingFrameDue && !nativeCarPreviewPossible
+                && !keepCameraOpen) {
             if (currentMode == Mode.NOT_RECORDING) {
                 frameSource.stop();
                 cameraSourceActive = false;
@@ -841,6 +854,116 @@ public final class CameraRecorderService extends Service
         segmentRecorder.updateGpsFix(fix);
     }
 
+    /** 주차 감시 모드로 진입합니다. */
+    public synchronized void enterParkingMode() {
+        if (mode == Mode.PARKING_STANDBY || mode == Mode.PARKING_RECORDING) {
+            publishState("주차 감시 모드가 이미 활성화되어 있습니다");
+            return;
+        }
+        // 기존 일반 녹화 중이라면 중지합니다.
+        if (mode == Mode.RECORDING) {
+            pendingRecordingSettings = null;
+            segmentRecorder.stop();
+            releaseWakeLock();
+        }
+        RecorderSettings settings = RecorderSettings.load(this);
+        // continuousRecordingEnabled는 false 유지 (주차 모드는 별도 상태)
+        settings.withContinuousRecordingEnabled(false).save(this);
+        // 카메라가 꺼져 있으면 시작합니다.
+        if (!cameraSourceActive) {
+            frameProcessor.configure(
+                    settings.resolution,
+                    settings.combinedLayout(),
+                    settings.cameraFlipHorizontal(),
+                    settings.cameraFlipVertical(),
+                    settings.fisheyeCropPercent());
+            frameSource.start();
+            cameraSourceActive = true;
+        }
+        mode = Mode.PARKING_STANDBY;
+        ParkingGuardSettings parkingSettings = new ParkingGuardSettings(
+                settings.parkingImpactThresholdG,
+                settings.parkingRecordingSeconds,
+                settings.parkingAutoLock);
+        parkingGuardController = new ParkingGuardController(
+                this,
+                new ParkingGuardController.Callback() {
+                    @Override
+                    public void onImpactRecordingStarted(float gForce) {
+                        handleImpactRecordingStarted(gForce);
+                    }
+                    @Override
+                    public void onImpactRecordingStopped() {
+                        handleImpactRecordingStopped();
+                    }
+                });
+        parkingGuardController.start(parkingSettings);
+        acquireWakeLock();
+        enterForeground();
+        publishState("주차 감시 시작 - 충격 감지 대기");
+    }
+
+    /** 주차 감시 모드를 해제합니다. */
+    public synchronized void exitParkingMode() {
+        if (mode != Mode.PARKING_STANDBY && mode != Mode.PARKING_RECORDING) {
+            publishState("주차 감시 모드가 활성화되어 있지 않습니다");
+            return;
+        }
+        if (parkingGuardController != null) {
+            parkingGuardController.stop();
+            parkingGuardController = null;
+        }
+        if (segmentRecorder.isStarted()) {
+            segmentRecorder.stop();
+        }
+        mode = Mode.NOT_RECORDING;
+        releaseWakeLock();
+        stopForeground(true);
+        applyPhoneAccessSetting(RecorderSettings.load(this));
+        publishState("주차 감시 종료");
+    }
+
+    private synchronized void handleImpactRecordingStarted(float gForce) {
+        if (mode != Mode.PARKING_STANDBY) {
+            return;
+        }
+        Log.i(TAG, "Parking impact: " + gForce + "G - starting recording");
+        mode = Mode.PARKING_RECORDING;
+        RecorderSettings settings = RecorderSettings.load(this);
+        RecorderSettings parkingRecordingSettings =
+                settings.withContinuousRecordingEnabled(false);
+        if (segmentRecorder.isStarted()) {
+            try {
+                segmentRecorder.rotateNow(settings.parkingAutoLock);
+            } catch (IOException exception) {
+                Log.e(TAG, "Parking segment rotate failed", exception);
+            }
+        } else {
+            lastRecordedFrameNanos = 0L;
+            pendingRecordingSettings = parkingRecordingSettings;
+            if (settings.parkingAutoLock) {
+                // 새 세그먼트가 열릴 때 자동 잠금되도록 설정
+                segmentRecorder.setAutoLockForNextSegment();
+            }
+        }
+        enterForeground();
+        publishState("충격 감지: " + String.format("%.1f", gForce) + "G - 녹화 시작");
+    }
+
+    private synchronized void handleImpactRecordingStopped() {
+        if (mode != Mode.PARKING_RECORDING) {
+            return;
+        }
+        Log.i(TAG, "Parking recording timeout - returning to standby");
+        if (segmentRecorder.isStarted()) {
+            segmentRecorder.stop();
+        }
+        pendingRecordingSettings = null;
+        mode = Mode.PARKING_STANDBY;
+        enterForeground();
+        publishState("주차 감시 녹화 완료 - 대기 중");
+    }
+
     public synchronized String regeneratePhoneAccessPin() {
         RecorderSettings updated =
                 RecorderSettings.load(this)
@@ -985,7 +1108,10 @@ public final class CameraRecorderService extends Service
                 current.gpsOverlayEnabled,
                 current.gpsSpeedUnit,
                 current.gpsShowCoordinates,
-                current.gpsTrackEnabled);
+                current.gpsTrackEnabled,
+                current.parkingImpactThresholdG,
+                current.parkingRecordingSeconds,
+                current.parkingAutoLock);
         updated.save(this);
         applyRecorderSettings(updated);
         publishSettingsChanged();
@@ -1252,15 +1378,22 @@ public final class CameraRecorderService extends Service
                 0,
                 activityIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT);
+        String contentText;
+        if (mode == Mode.RECORDING) {
+            contentText = "Recording five rolling camera videos";
+        } else if (mode == Mode.PARKING_STANDBY) {
+            contentText = "주차 감시 중 - 충격 감지 대기";
+        } else if (mode == Mode.PARKING_RECORDING) {
+            contentText = "충격 감지! 녹화 중";
+        } else {
+            contentText = phoneAccessServer == null
+                    ? "Phone app access needs attention"
+                    : "Phone app access is available";
+        }
         return builder
                 .setSmallIcon(R.drawable.ic_record)
                 .setContentTitle("BYD Camera Recorder")
-                .setContentText(
-                        mode == Mode.RECORDING
-                                ? "Recording five rolling camera videos"
-                                : phoneAccessServer == null
-                                        ? "Phone app access needs attention"
-                                        : "Phone app access is available")
+                .setContentText(contentText)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .setCategory(Notification.CATEGORY_SERVICE)
@@ -1313,6 +1446,10 @@ public final class CameraRecorderService extends Service
         switch (mode) {
             case RECORDING:
                 return "Recording active";
+            case PARKING_STANDBY:
+                return "Parking guard active";
+            case PARKING_RECORDING:
+                return "Parking guard recording";
             case NOT_RECORDING:
             default:
                 return "Not recording";

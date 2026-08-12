@@ -37,6 +37,9 @@ public final class RecorderSettings {
     private static final String KEY_GPS_SPEED_UNIT = "gps_speed_unit";
     private static final String KEY_GPS_SHOW_COORDINATES = "gps_show_coordinates";
     private static final String KEY_GPS_TRACK_ENABLED = "gps_track_enabled";
+    private static final String KEY_PARKING_IMPACT_THRESHOLD_G = "parking_impact_threshold_g";
+    private static final String KEY_PARKING_RECORDING_SECONDS = "parking_recording_seconds";
+    private static final String KEY_PARKING_AUTO_LOCK = "parking_auto_lock";
 
     public static final int DEFAULT_FISHEYE_CROP_PERCENT = 15;
     public static final int DEFAULT_MIN_FREE_PERCENT = 5;
@@ -78,6 +81,9 @@ public final class RecorderSettings {
     public final String gpsSpeedUnit;
     public final boolean gpsShowCoordinates;
     public final boolean gpsTrackEnabled;
+    public final float parkingImpactThresholdG;
+    public final int parkingRecordingSeconds;
+    public final boolean parkingAutoLock;
 
     public RecorderSettings(
             int volumeIndex,
@@ -101,7 +107,10 @@ public final class RecorderSettings {
             boolean gpsOverlayEnabled,
             String gpsSpeedUnit,
             boolean gpsShowCoordinates,
-            boolean gpsTrackEnabled) {
+            boolean gpsTrackEnabled,
+            float parkingImpactThresholdG,
+            int parkingRecordingSeconds,
+            boolean parkingAutoLock) {
         this.volumeIndex = Math.max(0, volumeIndex);
         this.quotaBytes = clampLong(
                 quotaBytes,
@@ -146,6 +155,15 @@ public final class RecorderSettings {
         this.gpsSpeedUnit = gpsSpeedUnit == null ? "kmh" : gpsSpeedUnit;
         this.gpsShowCoordinates = gpsShowCoordinates;
         this.gpsTrackEnabled = gpsTrackEnabled;
+        this.parkingImpactThresholdG = clampFloat(
+                parkingImpactThresholdG,
+                ParkingGuardSettings.MIN_IMPACT_THRESHOLD_G,
+                ParkingGuardSettings.MAX_IMPACT_THRESHOLD_G);
+        this.parkingRecordingSeconds = clamp(
+                parkingRecordingSeconds,
+                ParkingGuardSettings.MIN_RECORDING_SECONDS,
+                ParkingGuardSettings.MAX_RECORDING_SECONDS);
+        this.parkingAutoLock = parkingAutoLock;
     }
 
     public static RecorderSettings load(Context context) {
@@ -187,7 +205,14 @@ public final class RecorderSettings {
                 preferences.getBoolean(KEY_GPS_OVERLAY_ENABLED, true),
                 preferences.getString(KEY_GPS_SPEED_UNIT, "kmh"),
                 preferences.getBoolean(KEY_GPS_SHOW_COORDINATES, false),
-                preferences.getBoolean(KEY_GPS_TRACK_ENABLED, true));
+                preferences.getBoolean(KEY_GPS_TRACK_ENABLED, true),
+                preferences.getFloat(
+                        KEY_PARKING_IMPACT_THRESHOLD_G,
+                        ParkingGuardSettings.DEFAULT_IMPACT_THRESHOLD_G),
+                preferences.getInt(
+                        KEY_PARKING_RECORDING_SECONDS,
+                        ParkingGuardSettings.DEFAULT_RECORDING_SECONDS),
+                preferences.getBoolean(KEY_PARKING_AUTO_LOCK, true));
     }
 
     public void save(Context context) {
@@ -215,7 +240,10 @@ public final class RecorderSettings {
                 .putBoolean(KEY_GPS_OVERLAY_ENABLED, gpsOverlayEnabled)
                 .putString(KEY_GPS_SPEED_UNIT, gpsSpeedUnit)
                 .putBoolean(KEY_GPS_SHOW_COORDINATES, gpsShowCoordinates)
-                .putBoolean(KEY_GPS_TRACK_ENABLED, gpsTrackEnabled);
+                .putBoolean(KEY_GPS_TRACK_ENABLED, gpsTrackEnabled)
+                .putFloat(KEY_PARKING_IMPACT_THRESHOLD_G, parkingImpactThresholdG)
+                .putInt(KEY_PARKING_RECORDING_SECONDS, parkingRecordingSeconds)
+                .putBoolean(KEY_PARKING_AUTO_LOCK, parkingAutoLock);
         for (int index = 0; index < cameraNames.length; index++) {
             editor.putString(KEY_CAMERA_NAME_PREFIX + index, cameraNames[index]);
             editor.putInt(
@@ -300,7 +328,10 @@ public final class RecorderSettings {
                 gpsOverlayEnabled,
                 gpsSpeedUnit,
                 gpsShowCoordinates,
-                gpsTrackEnabled);
+                gpsTrackEnabled,
+                parkingImpactThresholdG,
+                parkingRecordingSeconds,
+                parkingAutoLock);
     }
 
     public RecorderSettings withPhoneAccess(
@@ -329,7 +360,10 @@ public final class RecorderSettings {
                 gpsOverlayEnabled,
                 gpsSpeedUnit,
                 gpsShowCoordinates,
-                gpsTrackEnabled);
+                gpsTrackEnabled,
+                parkingImpactThresholdG,
+                parkingRecordingSeconds,
+                parkingAutoLock);
     }
 
     public RecorderSettings withPhoneAccessPin(String accessPin) {
@@ -355,7 +389,10 @@ public final class RecorderSettings {
                 gpsOverlayEnabled,
                 gpsSpeedUnit,
                 gpsShowCoordinates,
-                gpsTrackEnabled);
+                gpsTrackEnabled,
+                parkingImpactThresholdG,
+                parkingRecordingSeconds,
+                parkingAutoLock);
     }
 
     public RecorderSettings withVehicleModelId(String newModelId) {
@@ -381,7 +418,10 @@ public final class RecorderSettings {
                 gpsOverlayEnabled,
                 gpsSpeedUnit,
                 gpsShowCoordinates,
-                gpsTrackEnabled);
+                gpsTrackEnabled,
+                parkingImpactThresholdG,
+                parkingRecordingSeconds,
+                parkingAutoLock);
     }
 
     private static String defaultCameraName(int cameraIndex) {
@@ -507,6 +547,10 @@ public final class RecorderSettings {
     }
 
     private static long clampLong(long value, long minimum, long maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    private static float clampFloat(float value, float minimum, float maximum) {
         return Math.max(minimum, Math.min(maximum, value));
     }
 }
