@@ -182,6 +182,16 @@ public final class MainActivity extends Activity
     private NumericStepper minFreeStepper;
     private NumericStepper parkingImpactStepper;
     private NumericStepper parkingDurationStepper;
+    private IconCheckbox telegramEnabledCheckbox;
+    private EditText telegramBotTokenInput;
+    private EditText telegramChatIdInput;
+    private IconCheckbox mqttEnabledCheckbox;
+    private EditText mqttHostInput;
+    private NumericStepper mqttPortStepper;
+    private EditText mqttUsernameInput;
+    private EditText mqttPasswordInput;
+    private EditText mqttTopicPrefixInput;
+    private IconCheckbox cloudflareEnabledCheckbox;
     private StyledSlider fisheyeCropSlider;
     private TextView fisheyeCropValueView;
     private LinearLayout segmentList;
@@ -1264,6 +1274,118 @@ public final class MainActivity extends Activity
         fields.addView(
                 labeledField("충격 후 녹화 시간", parkingDurationStepper),
                 matchWidthWrap(dp(0), dp(10)));
+
+        // ── Telegram 알림 ──────────────────────────────────────────────
+        fields.addView(
+                sectionTitleWithHelp(
+                        "Telegram 알림",
+                        "충격 감지 및 주차 감시 이벤트를 Telegram 메시지로 받습니다. "
+                                + "Bot Token과 Chat ID를 설정하세요."),
+                matchWidthWrap(dp(0), dp(8)));
+        telegramEnabledCheckbox = new IconCheckbox(this, "Telegram 알림 활성화");
+        telegramEnabledCheckbox.setListener(
+                new IconCheckbox.Listener() {
+                    @Override
+                    public void onCheckedChanged(boolean checked) {
+                        updateSettingsSaveState();
+                    }
+                });
+        fields.addView(
+                labeledFieldWithoutHelp("알림 활성화", telegramEnabledCheckbox),
+                matchWidthWrap(dp(0), dp(8)));
+        telegramBotTokenInput = textInput();
+        telegramBotTokenInput.setHint("Bot Token");
+        telegramBotTokenInput.addTextChangedListener(settingsChangeWatcher());
+        fields.addView(
+                labeledField("Bot Token", telegramBotTokenInput),
+                matchWidthWrap(dp(0), dp(8)));
+        telegramChatIdInput = textInput();
+        telegramChatIdInput.setHint("Chat ID");
+        telegramChatIdInput.addTextChangedListener(settingsChangeWatcher());
+        fields.addView(
+                labeledField("Chat ID", telegramChatIdInput),
+                matchWidthWrap(dp(0), dp(10)));
+
+        // ── MQTT (Home Assistant) ──────────────────────────────────────
+        fields.addView(
+                sectionTitleWithHelp(
+                        "MQTT (Home Assistant)",
+                        "GPS, 배터리 상태 등을 MQTT 브로커에 발행합니다. "
+                                + "Home Assistant MQTT Discovery를 지원합니다."),
+                matchWidthWrap(dp(0), dp(8)));
+        mqttEnabledCheckbox = new IconCheckbox(this, "MQTT 활성화");
+        mqttEnabledCheckbox.setListener(
+                new IconCheckbox.Listener() {
+                    @Override
+                    public void onCheckedChanged(boolean checked) {
+                        updateSettingsSaveState();
+                    }
+                });
+        fields.addView(
+                labeledFieldWithoutHelp("MQTT 활성화", mqttEnabledCheckbox),
+                matchWidthWrap(dp(0), dp(8)));
+        mqttHostInput = textInput();
+        mqttHostInput.setHint("192.168.1.100");
+        mqttHostInput.addTextChangedListener(settingsChangeWatcher());
+        fields.addView(
+                labeledField("브로커 주소", mqttHostInput),
+                matchWidthWrap(dp(0), dp(8)));
+        mqttPortStepper = numericStepper(
+                new NumericStepper.Specification(
+                        "포트",
+                        1,
+                        65535,
+                        1,
+                        new NumericStepper.ValueFormatter() {
+                            @Override
+                            public String format(int value) {
+                                return String.valueOf(value);
+                            }
+                        }));
+        fields.addView(
+                labeledField("포트", mqttPortStepper),
+                matchWidthWrap(dp(0), dp(8)));
+        mqttUsernameInput = textInput();
+        mqttUsernameInput.setHint("(선택)");
+        mqttUsernameInput.addTextChangedListener(settingsChangeWatcher());
+        fields.addView(
+                labeledField("사용자 이름", mqttUsernameInput),
+                matchWidthWrap(dp(0), dp(8)));
+        mqttPasswordInput = textInput();
+        mqttPasswordInput.setHint("(선택)");
+        mqttPasswordInput.setInputType(
+                android.text.InputType.TYPE_CLASS_TEXT
+                        | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        mqttPasswordInput.addTextChangedListener(settingsChangeWatcher());
+        fields.addView(
+                labeledField("비밀번호", mqttPasswordInput),
+                matchWidthWrap(dp(0), dp(8)));
+        mqttTopicPrefixInput = textInput();
+        mqttTopicPrefixInput.setHint("byd");
+        mqttTopicPrefixInput.addTextChangedListener(settingsChangeWatcher());
+        fields.addView(
+                labeledField("토픽 접두사", mqttTopicPrefixInput),
+                matchWidthWrap(dp(0), dp(10)));
+
+        // ── Cloudflare 터널 ────────────────────────────────────────────
+        fields.addView(
+                sectionTitleWithHelp(
+                        "외부 접속 (Cloudflare 터널)",
+                        "인터넷을 통해 폰앱에 접속할 수 있게 합니다. "
+                                + "활성화 시 cloudflared 바이너리가 자동으로 다운로드됩니다."),
+                matchWidthWrap(dp(0), dp(8)));
+        cloudflareEnabledCheckbox = new IconCheckbox(this, "Cloudflare 터널 활성화");
+        cloudflareEnabledCheckbox.setListener(
+                new IconCheckbox.Listener() {
+                    @Override
+                    public void onCheckedChanged(boolean checked) {
+                        updateSettingsSaveState();
+                    }
+                });
+        fields.addView(
+                labeledFieldWithoutHelp("터널 활성화", cloudflareEnabledCheckbox),
+                matchWidthWrap(dp(0), dp(10)));
+
         scroll.addView(fields);
         panel.addView(
                 scroll,
@@ -3247,6 +3369,36 @@ public final class MainActivity extends Activity
         if (parkingDurationStepper != null) {
             parkingDurationStepper.setValue(settings.parkingRecordingSeconds);
         }
+        if (telegramEnabledCheckbox != null) {
+            telegramEnabledCheckbox.setChecked(settings.telegramEnabled);
+        }
+        if (telegramBotTokenInput != null) {
+            telegramBotTokenInput.setText(settings.telegramBotToken);
+        }
+        if (telegramChatIdInput != null) {
+            telegramChatIdInput.setText(settings.telegramChatId);
+        }
+        if (mqttEnabledCheckbox != null) {
+            mqttEnabledCheckbox.setChecked(settings.mqttEnabled);
+        }
+        if (mqttHostInput != null) {
+            mqttHostInput.setText(settings.mqttHost);
+        }
+        if (mqttPortStepper != null) {
+            mqttPortStepper.setValue(settings.mqttPort);
+        }
+        if (mqttUsernameInput != null) {
+            mqttUsernameInput.setText(settings.mqttUsername);
+        }
+        if (mqttPasswordInput != null) {
+            mqttPasswordInput.setText(settings.mqttPassword);
+        }
+        if (mqttTopicPrefixInput != null) {
+            mqttTopicPrefixInput.setText(settings.mqttTopicPrefix);
+        }
+        if (cloudflareEnabledCheckbox != null) {
+            cloudflareEnabledCheckbox.setChecked(settings.cloudflareEnabled);
+        }
         for (int index = 0; index < cameraNameInputs.length; index++) {
             if (cameraNameInputs[index] != null) {
                 cameraNameInputs[index].setText(settings.cameraName(index));
@@ -3352,6 +3504,19 @@ public final class MainActivity extends Activity
         };
     }
 
+    private TextWatcher settingsChangeWatcher() {
+        return new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                updateSettingsSaveState();
+            }
+        };
+    }
+
     private void updateSettingsSaveState() {
         if (settingsSaveButton == null
                 || quotaStepper == null
@@ -3394,7 +3559,17 @@ public final class MainActivity extends Activity
                         == right.fisheyeCropPercent()
                 && Math.round(left.parkingImpactThresholdG * 10)
                         == Math.round(right.parkingImpactThresholdG * 10)
-                && left.parkingRecordingSeconds == right.parkingRecordingSeconds;
+                && left.parkingRecordingSeconds == right.parkingRecordingSeconds
+                && left.telegramEnabled == right.telegramEnabled
+                && left.telegramBotToken.equals(right.telegramBotToken)
+                && left.telegramChatId.equals(right.telegramChatId)
+                && left.mqttEnabled == right.mqttEnabled
+                && left.mqttHost.equals(right.mqttHost)
+                && left.mqttPort == right.mqttPort
+                && left.mqttUsername.equals(right.mqttUsername)
+                && left.mqttPassword.equals(right.mqttPassword)
+                && left.mqttTopicPrefix.equals(right.mqttTopicPrefix)
+                && left.cloudflareEnabled == right.cloudflareEnabled;
     }
 
     private void refreshStorage() {
@@ -4204,7 +4379,37 @@ public final class MainActivity extends Activity
                     settings.gpsTrackEnabled,
                     parkingImpactThresholdG,
                     parkingRecordingSeconds,
-                    settings.parkingAutoLock);
+                    settings.parkingAutoLock,
+                    telegramEnabledCheckbox != null
+                            ? telegramEnabledCheckbox.isChecked()
+                            : settings.telegramEnabled,
+                    telegramBotTokenInput != null
+                            ? telegramBotTokenInput.getText().toString().trim()
+                            : settings.telegramBotToken,
+                    telegramChatIdInput != null
+                            ? telegramChatIdInput.getText().toString().trim()
+                            : settings.telegramChatId,
+                    mqttEnabledCheckbox != null
+                            ? mqttEnabledCheckbox.isChecked()
+                            : settings.mqttEnabled,
+                    mqttHostInput != null
+                            ? mqttHostInput.getText().toString().trim()
+                            : settings.mqttHost,
+                    mqttPortStepper != null
+                            ? mqttPortStepper.getValue()
+                            : settings.mqttPort,
+                    mqttUsernameInput != null
+                            ? mqttUsernameInput.getText().toString().trim()
+                            : settings.mqttUsername,
+                    mqttPasswordInput != null
+                            ? mqttPasswordInput.getText().toString()
+                            : settings.mqttPassword,
+                    mqttTopicPrefixInput != null
+                            ? mqttTopicPrefixInput.getText().toString().trim()
+                            : settings.mqttTopicPrefix,
+                    cloudflareEnabledCheckbox != null
+                            ? cloudflareEnabledCheckbox.isChecked()
+                            : settings.cloudflareEnabled);
         } catch (NumberFormatException exception) {
             if (showErrors) {
                 showMessage("Enter valid numeric storage settings");

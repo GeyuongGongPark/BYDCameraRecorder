@@ -316,6 +316,11 @@ public final class PhoneAccessServer implements Closeable {
             sendJson(output, 401, "{\"authenticated\":false}");
             return;
         }
+        if (relativePath.equals("api/system") && request.method.equals("GET")) {
+            SystemMonitor.Snapshot snap = service.getSystemSnapshot();
+            sendJson(output, 200, snap != null ? snap.toJson() : "{}");
+            return;
+        }
         if (relativePath.equals("api/state") && request.method.equals("GET")) {
             service.notePhoneClient();
             sendJson(output, 200, service.createPhoneStateJson());

@@ -180,6 +180,10 @@ public final class CameraRecorderService extends Service
     private GpsDataProvider gpsDataProvider;
     private GpsOverlayRenderer gpsOverlayRenderer;
     private ParkingGuardController parkingGuardController;
+    private TelegramNotifier telegramNotifier;
+    private MqttPublisher mqttPublisher;
+    private SystemMonitor systemMonitor;
+    private CloudflaredTunnel cloudflaredTunnel;
 
     @Override
     public void onCreate() {
@@ -194,8 +198,13 @@ public final class CameraRecorderService extends Service
                 PowerManager.PARTIAL_WAKE_LOCK,
                 "BYDCamera:Recording");
         wakeLock.setReferenceCounted(false);
-        applyPhoneAccessSetting(RecorderSettings.load(this));
-        startGps(RecorderSettings.load(this));
+        RecorderSettings initialSettings = RecorderSettings.load(this);
+        applyPhoneAccessSetting(initialSettings);
+        startGps(initialSettings);
+        systemMonitor = new SystemMonitor();
+        initTelegramNotifier(initialSettings);
+        initMqttPublisher(initialSettings);
+        initCloudflaredTunnel(initialSettings);
         startSegmentRecoveryLoop();
     }
 
@@ -297,6 +306,18 @@ public final class CameraRecorderService extends Service
         stopGps();
         shutdown();
         closePhonePreviewWorker();
+        if (telegramNotifier != null) {
+            telegramNotifier.shutdown();
+            telegramNotifier = null;
+        }
+        if (mqttPublisher != null) {
+            mqttPublisher.stop();
+            mqttPublisher = null;
+        }
+        if (cloudflaredTunnel != null) {
+            cloudflaredTunnel.stop();
+            cloudflaredTunnel = null;
+        }
         super.onDestroy();
     }
 
@@ -794,6 +815,7 @@ public final class CameraRecorderService extends Service
     public synchronized void applyRecorderSettings(RecorderSettings settings) {
         applyPhoneAccessSetting(settings);
         applyGpsSettings(settings);
+        applyNotificationSettings(settings);
         if (mode == Mode.RECORDING) {
             // Segment length and storage policy changes take effect on the
             // running recording instead of waiting for a restart.
@@ -812,6 +834,74 @@ public final class CameraRecorderService extends Service
                     settings.cameraFlipVertical(),
                     settings.fisheyeCropPercent());
         }
+    }
+
+    private void initTelegramNotifier(RecorderSettings settings) {
+        telegramNotifier = new TelegramNotifier(
+                settings.telegramBotToken,
+                settings.telegramChatId,
+                settings.telegramEnabled);
+    }
+
+    private void initMqttPublisher(RecorderSettings settings) {
+        mqttPublisher = new MqttPublisher(
+                settings.mqttHost,
+                settings.mqttPort,
+                settings.mqttUsername,
+                settings.mqttPassword,
+                settings.mqttEnabled);
+        mqttPublisher.start();
+    }
+
+    private void initCloudflaredTunnel(RecorderSettings settings) {
+        cloudflaredTunnel = new CloudflaredTunnel(
+                this,
+                8765,
+                RecorderSettings.load(this).phoneAccessCode,
+                settings.cloudflareEnabled);
+        cloudflaredTunnel.setListener(new CloudflaredTunnel.Listener() {
+            @Override
+            public void onTunnelUrl(String url) {
+                Log.i(TAG, "Cloudflare tunnel URL: " + url);
+                if (telegramNotifier != null) {
+                    telegramNotifier.send("외부 접속 URL: " + url);
+                }
+                publishState("터널: " + url);
+            }
+
+            @Override
+            public void onTunnelStopped() {
+                Log.i(TAG, "Cloudflare tunnel stopped");
+            }
+        });
+        if (settings.cloudflareEnabled) {
+            cloudflaredTunnel.start();
+        }
+    }
+
+    private void applyNotificationSettings(RecorderSettings settings) {
+        if (telegramNotifier != null) {
+            telegramNotifier.update(
+                    settings.telegramBotToken,
+                    settings.telegramChatId,
+                    settings.telegramEnabled);
+        }
+        if (mqttPublisher != null) {
+            mqttPublisher.update(
+                    settings.mqttHost,
+                    settings.mqttPort,
+                    settings.mqttUsername,
+                    settings.mqttPassword,
+                    settings.mqttEnabled);
+        }
+        if (cloudflaredTunnel != null) {
+            cloudflaredTunnel.update(settings.cloudflareEnabled);
+        }
+    }
+
+    public SystemMonitor.Snapshot getSystemSnapshot() {
+        if (systemMonitor == null) return null;
+        return systemMonitor.snapshot(this);
     }
 
     private void startGps(RecorderSettings settings) {
@@ -948,6 +1038,17 @@ public final class CameraRecorderService extends Service
         }
         enterForeground();
         sendImpactNotification(gForce);
+        String impactMsg = "⚠️ 충격 감지: " + String.format("%.1f", gForce) + "G - 주차 녹화 시작";
+        if (telegramNotifier != null) {
+            telegramNotifier.send(impactMsg);
+        }
+        if (mqttPublisher != null) {
+            RecorderSettings s = RecorderSettings.load(this);
+            String prefix = s.mqttTopicPrefix;
+            mqttPublisher.publish(prefix + "/parking/impact",
+                    String.format("{\"gForce\":%.1f}", gForce));
+            mqttPublisher.publish(prefix + "/state", "parking_recording");
+        }
         publishState("충격 감지: " + String.format("%.1f", gForce) + "G - 녹화 시작");
     }
 
@@ -1112,7 +1213,17 @@ public final class CameraRecorderService extends Service
                 current.gpsTrackEnabled,
                 current.parkingImpactThresholdG,
                 current.parkingRecordingSeconds,
-                current.parkingAutoLock);
+                current.parkingAutoLock,
+                PhoneJson.booleanValue(json, "telegramEnabled", current.telegramEnabled),
+                PhoneJson.stringValue(json, "telegramBotToken", current.telegramBotToken),
+                PhoneJson.stringValue(json, "telegramChatId", current.telegramChatId),
+                PhoneJson.booleanValue(json, "mqttEnabled", current.mqttEnabled),
+                PhoneJson.stringValue(json, "mqttHost", current.mqttHost),
+                PhoneJson.intValue(json, "mqttPort", current.mqttPort),
+                PhoneJson.stringValue(json, "mqttUsername", current.mqttUsername),
+                PhoneJson.stringValue(json, "mqttPassword", current.mqttPassword),
+                PhoneJson.stringValue(json, "mqttTopicPrefix", current.mqttTopicPrefix),
+                PhoneJson.booleanValue(json, "cloudflareEnabled", current.cloudflareEnabled));
         updated.save(this);
         applyRecorderSettings(updated);
         publishSettingsChanged();

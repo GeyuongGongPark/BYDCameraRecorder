@@ -74,6 +74,10 @@ public final class IconCheckbox extends FrameLayout {
         setSelected(checked);
     }
 
+    public boolean isChecked() {
+        return checked;
+    }
+
     public void setListener(Listener listener) {
         this.listener = listener;
     }
