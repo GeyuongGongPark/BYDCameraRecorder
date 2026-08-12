@@ -1,0 +1,9 @@
+build/
+*.apk
+node_modules/
+phone-ui/node_modules/
+phone-ui/dist/
+assets/phone/
+.tools/
+*_build_secret/
+*.class

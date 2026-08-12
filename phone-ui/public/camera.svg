@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 108 108">
+  <defs>
+    <linearGradient id="launcher-background" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#57e0e4"/>
+      <stop offset="0.5" stop-color="#1bbbd7"/>
+      <stop offset="1" stop-color="#168ac8"/>
+    </linearGradient>
+  </defs>
+  <rect width="108" height="108" rx="24" fill="url(#launcher-background)"/>
+  <path d="M0 71 108 41v67H0Z" fill="#003b68" fill-opacity=".12"/>
+  <path d="M27 38h12l6-7c1-1 2-2 4-2h10c2 0 3 1 4 2l6 7h12c5 0 8 3 8 8v26c0 5-3 8-8 8H27c-5 0-8-3-8-8V46c0-5 3-8 8-8Z" fill="#f7fcff"/>
+  <circle cx="54" cy="57" r="15" fill="#08718d"/>
+  <circle cx="54" cy="57" r="11" fill="#c9f8ff"/>
+  <circle cx="54" cy="57" r="7" fill="#168ac8"/>
+  <circle cx="50" cy="54" r="3" fill="#fff" fill-opacity=".65"/>
+  <circle cx="77" cy="47" r="3" fill="#08718d"/>
+</svg>

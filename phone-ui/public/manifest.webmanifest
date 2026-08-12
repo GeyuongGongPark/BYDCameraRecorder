@@ -1,0 +1,17 @@
+{
+  "name": "BYD Camera Recorder",
+  "short_name": "BYD Camera",
+  "display": "standalone",
+  "start_url": ".",
+  "scope": ".",
+  "background_color": "#08111f",
+  "theme_color": "#08111f",
+  "icons": [
+    {
+      "src": "./camera.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
