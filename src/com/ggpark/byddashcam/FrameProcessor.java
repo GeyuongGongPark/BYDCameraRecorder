@@ -6,14 +6,30 @@ import java.util.ArrayDeque;
 import java.util.Arrays;
 
 public final class FrameProcessor {
-    public static final int CAMERA_COUNT = 4;
-    public static final int SOURCE_CAMERA_HEIGHT = 960;
-    public static final int SOURCE_CAMERA_WIDTH = 1280;
-    public static final int SOURCE_HEIGHT = 960;
-    public static final int SOURCE_WIDTH = SOURCE_CAMERA_WIDTH * CAMERA_COUNT;
+    // 이 상수들은 앱 시작 시 VehicleProfileRegistry.activate()를 통해 초기화됩니다.
+    // non-final로 선언되어 있지만 init() 이후에는 변경되지 않습니다.
+    public static int CAMERA_COUNT = 4;
+    public static int SOURCE_CAMERA_HEIGHT = 960;
+    public static int SOURCE_CAMERA_WIDTH = 1280;
+    public static int SOURCE_HEIGHT = 960;
+    public static int SOURCE_WIDTH = SOURCE_CAMERA_WIDTH * CAMERA_COUNT;
     public static final int VENDOR_NV21_FORMAT = 21;
-    public static final int PREVIEW_CAMERA_HEIGHT = SOURCE_CAMERA_HEIGHT;
-    public static final int PREVIEW_CAMERA_WIDTH = SOURCE_CAMERA_WIDTH;
+    public static int PREVIEW_CAMERA_HEIGHT = SOURCE_CAMERA_HEIGHT;
+    public static int PREVIEW_CAMERA_WIDTH = SOURCE_CAMERA_WIDTH;
+
+    /**
+     * VehicleProfile 값으로 정적 상수를 초기화합니다.
+     * VehicleProfileRegistry.activate()에서 호출하며, 앱 생애주기에서 한 번만 실행합니다.
+     */
+    public static void init(VehicleProfile profile) {
+        CAMERA_COUNT = profile.cameraCount();
+        SOURCE_CAMERA_WIDTH = profile.sourceCameraWidth();
+        SOURCE_CAMERA_HEIGHT = profile.sourceCameraHeight();
+        SOURCE_WIDTH = profile.sourceCameraWidth() * profile.cameraCount();
+        SOURCE_HEIGHT = profile.sourceCameraHeight();
+        PREVIEW_CAMERA_WIDTH = profile.sourceCameraWidth();
+        PREVIEW_CAMERA_HEIGHT = profile.sourceCameraHeight();
+    }
 
     public static final class ProcessedFrame {
         public final byte[][] cameras;

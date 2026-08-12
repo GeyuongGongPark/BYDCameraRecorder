@@ -31,6 +31,7 @@ public final class RecorderSettings {
     private static final String KEY_RESOLUTION = "resolution";
     private static final String KEY_RETENTION_DAYS = "retention_days";
     private static final String KEY_SEGMENT_MINUTES = "segment_minutes";
+    private static final String KEY_VEHICLE_MODEL_ID = "vehicle_model_id";
     private static final String KEY_VOLUME_INDEX = "volume_index";
 
     public static final int DEFAULT_FISHEYE_CROP_PERCENT = 15;
@@ -67,6 +68,7 @@ public final class RecorderSettings {
     public final VideoResolution resolution;
     public final int retentionDays;
     public final int segmentMinutes;
+    public final String vehicleModelId;
     public final int volumeIndex;
 
     public RecorderSettings(
@@ -86,7 +88,8 @@ public final class RecorderSettings {
             int[] combinedLayout,
             boolean[] cameraFlipHorizontal,
             boolean[] cameraFlipVertical,
-            int fisheyeCropPercent) {
+            int fisheyeCropPercent,
+            String vehicleModelId) {
         this.volumeIndex = Math.max(0, volumeIndex);
         this.quotaBytes = clampLong(
                 quotaBytes,
@@ -126,6 +129,7 @@ public final class RecorderSettings {
                         fisheyeCropPercent,
                         0,
                         MAX_CAMERA_CROP_PERCENT);
+        this.vehicleModelId = vehicleModelId == null ? "" : vehicleModelId;
     }
 
     public static RecorderSettings load(Context context) {
@@ -162,7 +166,8 @@ public final class RecorderSettings {
                 loadCombinedLayout(preferences),
                 loadCameraFlips(preferences, KEY_CAMERA_FLIP_HORIZONTAL_PREFIX),
                 loadCameraFlips(preferences, KEY_CAMERA_FLIP_VERTICAL_PREFIX),
-                loadFisheyeCropPercent(preferences));
+                loadFisheyeCropPercent(preferences),
+                preferences.getString(KEY_VEHICLE_MODEL_ID, ""));
     }
 
     public void save(Context context) {
@@ -185,7 +190,8 @@ public final class RecorderSettings {
                 .putString(KEY_DATE_FORMAT, dateFormat.id)
                 .putInt(
                         KEY_FISHEYE_CROP_PERCENT,
-                        fisheyeCropPercent);
+                        fisheyeCropPercent)
+                .putString(KEY_VEHICLE_MODEL_ID, vehicleModelId);
         for (int index = 0; index < cameraNames.length; index++) {
             editor.putString(KEY_CAMERA_NAME_PREFIX + index, cameraNames[index]);
             editor.putInt(
@@ -265,7 +271,8 @@ public final class RecorderSettings {
                 combinedLayout,
                 cameraFlipHorizontal,
                 cameraFlipVertical,
-                fisheyeCropPercent);
+                fisheyeCropPercent,
+                vehicleModelId);
     }
 
     public RecorderSettings withPhoneAccess(
@@ -289,7 +296,8 @@ public final class RecorderSettings {
                 combinedLayout,
                 cameraFlipHorizontal,
                 cameraFlipVertical,
-                fisheyeCropPercent);
+                fisheyeCropPercent,
+                vehicleModelId);
     }
 
     public RecorderSettings withPhoneAccessPin(String accessPin) {
@@ -310,7 +318,30 @@ public final class RecorderSettings {
                 combinedLayout,
                 cameraFlipHorizontal,
                 cameraFlipVertical,
-                fisheyeCropPercent);
+                fisheyeCropPercent,
+                vehicleModelId);
+    }
+
+    public RecorderSettings withVehicleModelId(String newModelId) {
+        return new RecorderSettings(
+                volumeIndex,
+                quotaBytes,
+                quotaConfigured,
+                retentionDays,
+                segmentMinutes,
+                minFreePercent,
+                resolution,
+                continuousRecordingEnabled,
+                phoneAccessEnabled,
+                phoneAccessCode,
+                phoneAccessPin,
+                dateFormat,
+                cameraNames,
+                combinedLayout,
+                cameraFlipHorizontal,
+                cameraFlipVertical,
+                fisheyeCropPercent,
+                newModelId);
     }
 
     private static String defaultCameraName(int cameraIndex) {

@@ -935,7 +935,8 @@ public final class CameraRecorderService extends Service
                 PhoneJson.intValue(
                         json,
                         "fisheyeCropPercent",
-                        current.fisheyeCropPercent()));
+                        current.fisheyeCropPercent()),
+                current.vehicleModelId);
         updated.save(this);
         applyRecorderSettings(updated);
         publishSettingsChanged();

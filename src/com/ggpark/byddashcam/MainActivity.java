@@ -4093,7 +4093,8 @@ public final class MainActivity extends Activity
                     combinedLayoutDraft,
                     cameraFlipHorizontal,
                     cameraFlipVertical,
-                    fisheyeCropPercent);
+                    fisheyeCropPercent,
+                    settings.vehicleModelId);
         } catch (NumberFormatException exception) {
             if (showErrors) {
                 showMessage("Enter valid numeric storage settings");

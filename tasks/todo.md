@@ -1,10 +1,10 @@
 # BYD Camera Recorder - 작업 계획
 
 ## Phase 0: 프로젝트 기반 구축
-- [ ] 참조 앱(GHDanielG) 소스 전체 복사 + 패키지명/앱명 변경
-- [ ] 빌드 환경 구성 (toolchain, build.sh)
+- [x] 참조 앱(GHDanielG) 소스 전체 복사 + 패키지명/앱명 변경
+- [x] 빌드 환경 구성 (macOS Android SDK 자동 감지, d8 지원, bash 3.2 호환)
+- [x] 기존 기능 회귀 없이 빌드 통과 확인 (build/byd-dashcam-debug.apk 312K)
 - [ ] 에뮬레이터에서 FixtureFrameSource 정상 동작 확인
-- [ ] 기존 기능 회귀 없이 빌드 통과 확인
 
 ## Phase 1: 모델 지원 확대
 - [ ] `VehicleProfile` interface 작성

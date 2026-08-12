@@ -8,7 +8,6 @@ import android.view.Surface;
 import java.util.Locale;
 
 public final class AvmCameraController implements FrameSource {
-    private static final int CAMERA_ID = 0;
     private static final long FRAME_METADATA_LOG_INTERVAL_NANOS =
             5_000_000_000L;
     private static final long SOURCE_DIAGNOSTICS_INTERVAL_NANOS =
@@ -16,10 +15,13 @@ public final class AvmCameraController implements FrameSource {
     private static final long RENDER_KICK_MIN_INTERVAL_NANOS =
             30_000_000_000L;
     private static final int MAXIMUM_REQUESTED_FPS = 30;
-    private static final int PREVIEW_HEIGHT = 960;
-    private static final int PREVIEW_WIDTH = 1280;
     private static final String TAG = "BYDCamera";
-    private static final int VIEW_INDEX = 0;
+
+    // 차량 모델별 설정: 앱 시작 시 VehicleProfileRegistry에서 결정됩니다.
+    private final int cameraId;
+    private final int viewIndex;
+    private final int previewWidth;
+    private final int previewHeight;
 
     private final FrameSource.Listener listener;
     private final SurfaceTexture[] previewTextures =
@@ -87,9 +89,9 @@ public final class AvmCameraController implements FrameSource {
                         Log.i(
                                 TAG,
                                 "First AVM callback: requested="
-                                        + PREVIEW_WIDTH
+                                        + previewWidth
                                         + "x"
-                                        + PREVIEW_HEIGHT
+                                        + previewHeight
                                         + " deliveredMetadata="
                                         + width
                                         + "x"
@@ -170,6 +172,11 @@ public final class AvmCameraController implements FrameSource {
 
     public AvmCameraController(FrameSource.Listener listener) {
         this.listener = listener;
+        VehicleProfile profile = VehicleProfileRegistry.getActive();
+        this.cameraId = profile.avmCameraId();
+        this.viewIndex = profile.avmViewIndex();
+        this.previewWidth = profile.sourceCameraWidth();
+        this.previewHeight = profile.sourceCameraHeight();
     }
 
     public synchronized void attachPreviewTexture(
@@ -314,7 +321,7 @@ public final class AvmCameraController implements FrameSource {
                     }
                 }
             }
-            activeCamera.disablePreviewCallback(VIEW_INDEX);
+            activeCamera.disablePreviewCallback(viewIndex);
             activeCamera.setPreviewCallback(null);
             activeCamera.setEventCallback(null);
             activeCamera.stopPreview();
@@ -376,7 +383,7 @@ public final class AvmCameraController implements FrameSource {
     private void openCamera() {
         publishState("Opening direct AVM camera");
         try {
-            AVMCamera openedCamera = AVMCamera.open(CAMERA_ID);
+            AVMCamera openedCamera = AVMCamera.open(cameraId);
             if (!running) {
                 if (openedCamera != null) {
                     openedCamera.close();
@@ -392,19 +399,19 @@ public final class AvmCameraController implements FrameSource {
             camera = openedCamera;
             openedCamera.setEventCallback(eventCallback);
             openedCamera.setPreviewCallback(previewCallback);
-            boolean sizeSet = openedCamera.setPreviewSize(PREVIEW_WIDTH, PREVIEW_HEIGHT);
+            boolean sizeSet = openedCamera.setPreviewSize(previewWidth, previewHeight);
             boolean fpsSet = openedCamera.setCameraFps(MAXIMUM_REQUESTED_FPS);
             int reportedWidth = openedCamera.getPreviewWidth();
             int reportedHeight = openedCamera.getPreviewHeight();
-            boolean callbackEnabled = openedCamera.enablePreviewCallback(VIEW_INDEX);
+            boolean callbackEnabled = openedCamera.enablePreviewCallback(viewIndex);
             applyPreviewSurfaces(openedCamera);
             boolean previewStarted = openedCamera.startPreview();
             Log.i(
                     TAG,
                     "AVM configuration: requested="
-                            + PREVIEW_WIDTH
+                            + previewWidth
                             + "x"
-                            + PREVIEW_HEIGHT
+                            + previewHeight
                             + "@"
                             + MAXIMUM_REQUESTED_FPS
                             + " reported="
