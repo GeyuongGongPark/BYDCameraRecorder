@@ -1568,15 +1568,13 @@ public final class CameraRecorderService extends Service
                 PendingIntent.FLAG_UPDATE_CURRENT);
         String contentText;
         if (mode == Mode.RECORDING) {
-            contentText = "녹화 중";
+            contentText = getString(R.string.notif_recording);
         } else if (mode == Mode.PARKING_STANDBY) {
-            contentText = "주차 감시 대기";
+            contentText = getString(R.string.notif_parking_standby);
         } else if (mode == Mode.PARKING_RECORDING) {
-            contentText = "이벤트 녹화 중";
+            contentText = getString(R.string.notif_parking_recording);
         } else {
-            contentText = phoneAccessServer == null
-                    ? "폰 연결 확인 필요"
-                    : "폰 연결 가능";
+            contentText = getString(R.string.notif_phone_available);
         }
         return builder
                 .setSmallIcon(R.drawable.ic_record)

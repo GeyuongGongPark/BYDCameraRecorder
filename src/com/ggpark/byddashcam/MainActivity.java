@@ -182,6 +182,7 @@ public final class MainActivity extends Activity
     private NumericStepper minFreeStepper;
     private NumericStepper parkingImpactStepper;
     private NumericStepper parkingDurationStepper;
+    private IconCheckbox parkingAutoLockCheckbox;
     private IconCheckbox telegramEnabledCheckbox;
     private EditText telegramBotTokenInput;
     private EditText telegramChatIdInput;
@@ -1347,6 +1348,19 @@ public final class MainActivity extends Activity
         fields.addView(
                 labeledFieldWithoutHelp(getString(R.string.setting_post_impact_duration),
                         parkingDurationStepper),
+                matchWidthWrap(dp(0), dp(10)));
+        parkingAutoLockCheckbox = new IconCheckbox(this,
+                getString(R.string.parking_auto_lock_label));
+        parkingAutoLockCheckbox.setListener(
+                new IconCheckbox.Listener() {
+                    @Override
+                    public void onCheckedChanged(boolean checked) {
+                        updateSettingsSaveState();
+                    }
+                });
+        fields.addView(
+                labeledField(getString(R.string.setting_parking_auto_lock),
+                        parkingAutoLockCheckbox, R.string.help_parking_auto_lock),
                 matchWidthWrap(dp(0), dp(10)));
 
         // ── Telegram 알림 ──────────────────────────────────────────────
@@ -3467,6 +3481,9 @@ public final class MainActivity extends Activity
         if (parkingDurationStepper != null) {
             parkingDurationStepper.setValue(settings.parkingRecordingSeconds);
         }
+        if (parkingAutoLockCheckbox != null) {
+            parkingAutoLockCheckbox.setChecked(settings.parkingAutoLock);
+        }
         if (telegramEnabledCheckbox != null) {
             telegramEnabledCheckbox.setChecked(settings.telegramEnabled);
         }
@@ -4475,7 +4492,9 @@ public final class MainActivity extends Activity
                     settings.gpsTrackEnabled,
                     parkingImpactThresholdG,
                     parkingRecordingSeconds,
-                    settings.parkingAutoLock,
+                    parkingAutoLockCheckbox != null
+                            ? parkingAutoLockCheckbox.isChecked()
+                            : settings.parkingAutoLock,
                     telegramEnabledCheckbox != null
                             ? telegramEnabledCheckbox.isChecked()
                             : settings.telegramEnabled,

@@ -84,11 +84,20 @@
 
     <!-- 주차 감시 -->
     <string name="section_parking_guard">주차 감시 설정</string>
-    <string name="parking_guard_description">충격이 감지되면 자동으로 녹화를 시작합니다. 임계값이 낮을수록 작은 충격도 감지되며, 녹화 시간은 충격 감지 후 계속 녹화하는 시간입니다.</string>
+    <string name="parking_guard_description">충격이 감지되면 자동으로 녹화를 시작합니다. 대기 중에는 짧은 클립을 계속 녹화하여 충격 이전 영상도 보존됩니다. 임계값이 낮을수록 작은 충격도 감지됩니다.</string>
     <string name="setting_impact_threshold">충격 임계값</string>
     <string name="setting_recording_duration">녹화 시간</string>
     <string name="setting_post_impact_duration">충격 후 녹화 시간</string>
+    <string name="setting_parking_auto_lock">이벤트 세그먼트 자동 잠금</string>
+    <string name="parking_auto_lock_label">자동 잠금 활성화</string>
+    <string name="help_parking_auto_lock">충격 감지 시 녹화된 이벤트 세그먼트와 충격 이전 버퍼를 자동으로 잠가 자동 삭제를 방지합니다.</string>
     <string name="duration_seconds">%d초</string>
+
+    <!-- 알림 -->
+    <string name="notif_recording">녹화 중</string>
+    <string name="notif_parking_standby">주차 감시 대기</string>
+    <string name="notif_parking_recording">주차 감시 이벤트 녹화</string>
+    <string name="notif_phone_available">폰 연결 가능</string>
 
     <!-- Telegram -->
     <string name="section_telegram">Telegram 알림</string>

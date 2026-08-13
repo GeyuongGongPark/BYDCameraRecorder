@@ -84,11 +84,20 @@
 
     <!-- Parking guard -->
     <string name="section_parking_guard">Parking guard settings</string>
-    <string name="parking_guard_description">Automatically starts recording when an impact is detected. Lower threshold means smaller impacts trigger recording. Recording time is the duration after an impact is detected.</string>
+    <string name="parking_guard_description">Automatically starts recording when an impact is detected. While on standby, continuous short clips are recorded so footage before an impact is also saved. Lower threshold means smaller impacts trigger recording.</string>
     <string name="setting_impact_threshold">Impact threshold</string>
     <string name="setting_recording_duration">Recording duration</string>
     <string name="setting_post_impact_duration">Post-impact recording time</string>
+    <string name="setting_parking_auto_lock">Auto-lock event segments</string>
+    <string name="parking_auto_lock_label">Auto-lock enabled</string>
+    <string name="help_parking_auto_lock">Automatically locks the captured event segment and the pre-impact buffer so they are protected from automatic cleanup.</string>
     <string name="duration_seconds">%d sec</string>
+
+    <!-- Notifications -->
+    <string name="notif_recording">Recording</string>
+    <string name="notif_parking_standby">Parking guard — standby</string>
+    <string name="notif_parking_recording">Parking guard — event recording</string>
+    <string name="notif_phone_available">Phone connection available</string>
 
     <!-- Telegram -->
     <string name="section_telegram">Telegram notifications</string>
