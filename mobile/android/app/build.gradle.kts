@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.ggpark.byddashcam.byd_dashcam"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
