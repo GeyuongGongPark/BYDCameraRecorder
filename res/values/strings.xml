@@ -1,4 +1,196 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">BYD블랙박스</string>
+
+    <!-- Header -->
+    <string name="connecting_to_service">Connecting to recorder service</string>
+    <string name="hide_controls">Hide controls and recordings</string>
+
+    <!-- State -->
+    <string name="state_recording">RECORDING</string>
+    <string name="state_not_recording">NOT RECORDING</string>
+    <string name="state_parking_standby">Parking standby</string>
+    <string name="state_parking_recording">Parking recording</string>
+
+    <!-- Action bar -->
+    <string name="recording_off_label">Recording is off; tap to start</string>
+    <string name="recording_on_label">Recording is on; tap to pause</string>
+    <string name="parking_start_label">Parking guard</string>
+    <string name="parking_active_label">Parking active — tap to stop</string>
+
+    <!-- Settings overlay -->
+    <string name="settings_title">Recorder settings</string>
+    <string name="settings_description">Changes apply to future recordings. Active recordings keep their current profile.</string>
+
+    <!-- Language section -->
+    <string name="language_section">Language / 언어</string>
+
+    <!-- Storage -->
+    <string name="section_storage">Storage</string>
+    <string name="storage_available">Available</string>
+    <string name="storage_recorder">Recorder</string>
+    <string name="storage_locked">Locked</string>
+    <string name="storage_location">Recording location</string>
+    <string name="storage_policy">Recording policy</string>
+    <string name="storage_total">Total</string>
+    <string name="storage_quota_label">Quota</string>
+    <string name="storage_retention_label">Retention</string>
+    <string name="storage_reserve">Reserve</string>
+    <string name="storage_segment">Segment</string>
+    <string name="storage_resolution">Resolution</string>
+    <string name="loading">Loading</string>
+
+    <!-- Phone access -->
+    <string name="phone_access_label">Phone app access</string>
+    <string name="phone_access_off_toggle">Phone app access is off; tap to enable</string>
+    <string name="phone_access_on_toggle">Phone app access is on; tap to disable</string>
+    <string name="phone_access_url_loading">Phone access URL is loading</string>
+    <string name="phone_access_is_off">Phone app access is off</string>
+    <string name="phone_access_unavailable">Phone app access is unavailable</string>
+    <string name="help_phone_access">Allows phones on the same network to control and view the recorder after PIN authorization. Turning it off immediately blocks phone access.</string>
+
+    <!-- Background access -->
+    <string name="background_access_title">Background recording access</string>
+    <string name="background_access_allowed">Allowed by Android</string>
+    <string name="background_access_warning">Battery optimization may stop background recording</string>
+    <string name="background_access_unsupported">Unavailable on BYD; automatic startup is not verified</string>
+    <string name="background_access_dialog_title">Allow background recording</string>
+    <string name="background_access_dialog_message">To keep recording after the car interface closes, Android must exempt this recorder from battery optimization. Confirm, then allow the request on the Android screen. This does not override Android force-stop.</string>
+    <string name="background_access_open_settings">Open Android settings</string>
+    <string name="background_access_suppress">Don\'t show again</string>
+    <string name="background_access_unsupported_title">Background recording on this system</string>
+    <string name="background_access_unsupported_message">This BYD multimedia system does not expose Android\'s battery-optimization exemption screen to apps. Automatic startup and continued recording are not verified on this system.</string>
+    <string name="background_access_already_title">Background recording access</string>
+    <string name="background_access_already_message">Android battery optimization is already disabled for this recorder. Recording can continue when the car interface is not open. Android force-stop still stops every app and cannot be bypassed.</string>
+
+    <!-- Settings fields -->
+    <string name="setting_recording_volume">Recording volume</string>
+    <string name="setting_date_format">Date and time format</string>
+    <string name="section_camera_names">Camera names</string>
+    <string name="camera_number">Camera %d</string>
+    <string name="section_camera_orientation">Camera orientation</string>
+    <string name="orientation_help">Enable either direction for each camera. Existing recordings are unchanged.</string>
+    <string name="section_fisheye_crop">Fisheye edge crop</string>
+    <string name="fisheye_help">0%% keeps the full lens. Drag the slider to preview one crop for all cameras.</string>
+    <string name="section_combined_layout">Combined video layout</string>
+    <string name="combined_layout_help">Drag a named camera tile onto another corner to swap them.</string>
+    <string name="setting_quota">Recorder quota</string>
+    <string name="setting_retention">Retention</string>
+    <string name="setting_segment">Segment length</string>
+    <string name="setting_min_free">Minimum volume free</string>
+    <string name="retention_days">%d days</string>
+    <string name="retention_day">%d day</string>
+    <string name="segment_minutes">%d min</string>
+
+    <!-- Parking guard -->
+    <string name="section_parking_guard">Parking guard settings</string>
+    <string name="parking_guard_description">Automatically starts recording when an impact is detected. Lower threshold means smaller impacts trigger recording. Recording time is the duration after an impact is detected.</string>
+    <string name="setting_impact_threshold">Impact threshold</string>
+    <string name="setting_recording_duration">Recording duration</string>
+    <string name="setting_post_impact_duration">Post-impact recording time</string>
+    <string name="duration_seconds">%d sec</string>
+
+    <!-- Telegram -->
+    <string name="section_telegram">Telegram notifications</string>
+    <string name="telegram_description">Receive Telegram messages for impact detection and parking guard events. Set Bot Token and Chat ID.</string>
+    <string name="setting_notifications_enabled">Notifications enabled</string>
+    <string name="telegram_enabled_label">Telegram notifications enabled</string>
+
+    <!-- MQTT -->
+    <string name="section_mqtt">MQTT (Home Assistant)</string>
+    <string name="mqtt_description">Publishes GPS, battery status, etc. to an MQTT broker. Supports Home Assistant MQTT Discovery.</string>
+    <string name="setting_mqtt_enabled">MQTT enabled</string>
+    <string name="mqtt_enabled_label">MQTT enabled</string>
+    <string name="setting_broker_address">Broker address</string>
+    <string name="setting_port">Port</string>
+    <string name="setting_username">Username</string>
+    <string name="setting_password">Password</string>
+    <string name="setting_topic_prefix">Topic prefix</string>
+    <string name="hint_optional">(optional)</string>
+
+    <!-- Cloudflare -->
+    <string name="section_cloudflare">External access (Cloudflare tunnel)</string>
+    <string name="cloudflare_description">Allows access to the phone app over the internet. Enabling it automatically downloads the cloudflared binary.</string>
+    <string name="setting_tunnel_enabled">Tunnel enabled</string>
+    <string name="cloudflare_enabled_label">Cloudflare tunnel enabled</string>
+
+    <!-- Recordings -->
+    <string name="section_recordings">Recordings</string>
+
+    <!-- Selection toolbar -->
+    <string name="select_all">Select all recordings</string>
+    <string name="clear_selection">Clear recording selection</string>
+    <string name="lock_selected">Lock selected recordings</string>
+    <string name="unlock_selected">Unlock selected recordings</string>
+    <string name="delete_selected">Delete selected recordings</string>
+
+    <!-- Confirmation dialogs -->
+    <string name="confirm_select_all_title">Select all recordings?</string>
+    <string name="confirm_select_all_message">This selects every finalized recording shown.</string>
+    <string name="confirm_clear_title">Clear selection?</string>
+    <string name="confirm_clear_message">No recordings will be changed.</string>
+    <string name="confirm_lock_title">Lock selected recordings?</string>
+    <string name="confirm_lock_message">Locked recordings are protected from automatic cleanup.</string>
+    <string name="confirm_unlock_title">Unlock selected recordings?</string>
+    <string name="confirm_unlock_message">Unlocked recordings can be deleted and may be removed by automatic cleanup.</string>
+    <string name="confirm_delete_title">Delete selected recordings?</string>
+    <string name="confirm_delete_message">This permanently deletes the selected finalized recordings.</string>
+    <string name="action_regenerate">Regenerate</string>
+    <string name="confirm_pin_title">Regenerate phone PIN?</string>
+    <string name="confirm_pin_message">Every connected phone will be signed out immediately and must enter the new PIN.</string>
+    <string name="unlock_before_delete_title">Unlock before deleting</string>
+
+    <!-- Segment states -->
+    <string name="segment_recording_now">recording now</string>
+    <string name="segment_finalizing">finalizing</string>
+    <string name="segment_incomplete">incomplete</string>
+    <string name="segment_unlocked">unlocked</string>
+    <string name="segment_locked_state">locked</string>
+    <string name="segment_locked_suffix"> — locked</string>
+    <string name="writing_files">Writing files</string>
+    <string name="recording_in_progress">Recording in progress\nPreviews and file actions unlock after finalization.</string>
+    <string name="finalizing_recording">Finalizing recording — the videos are being assembled and will be available shortly.</string>
+    <string name="interrupted_recording">Interrupted recording\nFiles were not finalized. Long-press to select and delete it, or keep it for recovery.</string>
+
+    <!-- Segment card accessibility -->
+    <string name="segment_active_desc">Active recording %s</string>
+    <string name="segment_finalizing_desc">Finalizing recording %s</string>
+    <string name="segment_incomplete_desc">Interrupted recording %s</string>
+    <string name="segment_open_desc">Open recording %s</string>
+
+    <!-- Toast messages -->
+    <string name="msg_settings_updated_phone">Recorder settings updated from phone</string>
+    <string name="msg_service_disconnected">Recorder service disconnected</string>
+    <string name="msg_service_unavailable">Recorder service is unavailable</string>
+    <string name="msg_pin_regenerated">Phone PIN regenerated</string>
+    <string name="msg_recordings_locked">Selected recordings locked</string>
+    <string name="msg_recordings_unlocked">Selected recordings unlocked</string>
+    <string name="msg_recordings_deleted">Selected recordings deleted</string>
+    <string name="msg_active_cannot_select">The active recording cannot be selected</string>
+    <string name="msg_invalid_settings">Enter valid numeric storage settings</string>
+    <string name="msg_settings_saved">Recorder settings saved</string>
+    <string name="msg_camera_permission">Camera permissions are required</string>
+
+    <!-- Help texts -->
+    <string name="help_camera_names">Names identify the physical camera views in car and phone previews. New MP4 filenames use each valid custom name plus the segment ISO time; invalid filesystem names fall back to Camera-1 through Camera-4.</string>
+    <string name="help_recording_volume">Chooses where new recording folders are written. Existing recordings remain on their current volume.</string>
+    <string name="help_video_resolution">Controls detail and file size for all individual camera files and the combined file. Higher detail uses storage faster.</string>
+    <string name="help_date_format">Changes displayed recording dates. Folder names keep their filesystem-safe canonical format.</string>
+    <string name="help_quota">Maximum recorder space on the selected volume. Cleanup removes only unlocked recorder-owned recordings.</string>
+    <string name="help_retention">Unlocked recordings older than this many days may be removed automatically. Locked recordings stay protected.</string>
+    <string name="help_segment">How long each recording folder runs before a new segment starts. Shorter segments create more files.</string>
+    <string name="help_min_free">Recording stops before free space falls below this percentage, protecting the car and other apps from a full disk.</string>
+    <string name="help_camera_orientation">Flips a physical camera view horizontally, vertically, or in both directions. The saved orientation is applied consistently to live previews and new individual and combined recordings.</string>
+    <string name="help_fisheye_crop">Cuts one shared percentage from every edge of all four cameras, then expands each remaining center image to fill the frame. This reduces distorted low-information fisheye edges. The same transform is applied to previews and new individual and combined recordings.</string>
+    <string name="help_combined_layout">Sets which camera appears in each corner of newly created combined videos. Individual camera videos are never reordered.</string>
+    <string name="help_default">Controls this recorder setting.</string>
+
+    <!-- Phone access activity -->
+    <string name="phone_access_activity_title">Phone app access</string>
+    <string name="phone_access_requirement">The phone and car must be connected to the same Wi-Fi network.\nConnecting the car to your phone\'s shared hotspot also works.</string>
+    <string name="phone_access_scan">Scan to open on your phone</string>
+    <string name="phone_access_starting">Starting phone app access</string>
+    <string name="phone_access_pin_label">Phone PIN</string>
+    <string name="phone_access_link_copied">Phone app link copied</string>
+    <string name="clipboard_unavailable">Clipboard is unavailable</string>
 </resources>

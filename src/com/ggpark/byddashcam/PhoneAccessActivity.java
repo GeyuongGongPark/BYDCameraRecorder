@@ -49,10 +49,15 @@ public final class PhoneAccessActivity extends Activity {
                 public void onServiceDisconnected(ComponentName name) {
                     serviceBound = false;
                     recorderService = null;
-                    statusView.setText("Recorder service disconnected");
+                    statusView.setText(getString(R.string.msg_service_disconnected));
                     copyButton.setEnabled(false);
                 }
             };
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(LocaleHelper.onAttach(base));
+    }
 
     @Override
     protected void onCreate(Bundle state) {
@@ -87,7 +92,7 @@ public final class PhoneAccessActivity extends Activity {
 
         LinearLayout header = horizontal();
         header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = text("Phone app access", 25, true);
+        TextView title = text(getString(R.string.phone_access_activity_title), 25, true);
         header.addView(
                 title,
                 new LinearLayout.LayoutParams(
@@ -110,8 +115,7 @@ public final class PhoneAccessActivity extends Activity {
         panel.addView(header);
 
         TextView requirement = text(
-                "The phone and car must be connected to the same Wi-Fi network.\n"
-                        + "Connecting the car to your phone's shared hotspot also works.",
+                getString(R.string.phone_access_requirement),
                 17,
                 true);
         requirement.setPadding(0, dp(10), 0, dp(12));
@@ -124,7 +128,7 @@ public final class PhoneAccessActivity extends Activity {
         qrColumn.setGravity(Gravity.CENTER_HORIZONTAL);
         qrView = PhoneAccessQrView.create(this);
         qrColumn.addView(qrView, new LinearLayout.LayoutParams(dp(250), dp(250)));
-        TextView scanLabel = text("Scan to open on your phone", 13, true);
+        TextView scanLabel = text(getString(R.string.phone_access_scan), 13, true);
         scanLabel.setTextColor(Color.rgb(159, 179, 204));
         scanLabel.setGravity(Gravity.CENTER);
         scanLabel.setPadding(0, dp(7), 0, 0);
@@ -157,7 +161,7 @@ public final class PhoneAccessActivity extends Activity {
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        statusView = text("Starting phone app access", 14, false);
+        statusView = text(getString(R.string.phone_access_starting), 14, false);
         statusView.setTextColor(Color.rgb(159, 179, 204));
         statusView.setPadding(dp(2), dp(9), 0, dp(7));
         detailsColumn.addView(statusView);
@@ -201,7 +205,7 @@ public final class PhoneAccessActivity extends Activity {
         pinRow.setGravity(Gravity.CENTER_VERTICAL);
         pinRow.setBackgroundResource(R.drawable.card_background);
         pinRow.setPadding(dp(14), 0, dp(6), 0);
-        TextView pinLabel = text("Phone PIN", 14, false);
+        TextView pinLabel = text(getString(R.string.phone_access_pin_label), 14, false);
         pinLabel.setTextColor(Color.rgb(159, 179, 204));
         pinRow.addView(
                 pinLabel,
@@ -287,21 +291,20 @@ public final class PhoneAccessActivity extends Activity {
     private void confirmPinRegeneration() {
         ConfirmationDialog.show(
                 this,
-                "Regenerate phone PIN?",
-                "Every connected phone will be signed out immediately "
-                        + "and must enter the new PIN.",
-                "Regenerate",
+                getString(R.string.confirm_pin_title),
+                getString(R.string.confirm_pin_message),
+                getString(R.string.action_regenerate),
                 ConfirmationDialog.Tone.WARNING,
                 new Runnable() {
                     @Override
                     public void run() {
                         if (recorderService == null) {
-                            showMessage("Recorder service is unavailable");
+                            showMessage(getString(R.string.msg_service_unavailable));
                             return;
                         }
                         pinView.setPin(
                                 recorderService.regeneratePhoneAccessPin());
-                        showMessage("Phone PIN regenerated");
+                        showMessage(getString(R.string.msg_pin_regenerated));
                     }
                 });
     }
@@ -313,12 +316,12 @@ public final class PhoneAccessActivity extends Activity {
         ClipboardManager clipboard =
                 (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard == null) {
-            showMessage("Clipboard is unavailable");
+            showMessage(getString(R.string.clipboard_unavailable));
             return;
         }
         clipboard.setPrimaryClip(
                 ClipData.newPlainText("BYD Camera phone app", urlView.getText()));
-        showMessage("Phone app link copied");
+        showMessage(getString(R.string.phone_access_link_copied));
     }
 
     private TextView text(String value, int sizeSp, boolean bold) {

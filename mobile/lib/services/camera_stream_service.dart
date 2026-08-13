@@ -1,18 +1,23 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
-import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/server_config.dart';
 
 /// WebSocket으로 차량 카메라 JPEG 스트림을 수신합니다.
 class CameraStreamService {
   final ServerConfig config;
   final int cameraIndex; // 1-based
+  final String? sessionCookie;
 
-  WebSocketChannel? _channel;
+  WebSocket? _socket;
   StreamController<Uint8List>? _controller;
   bool _closed = false;
 
-  CameraStreamService({required this.config, required this.cameraIndex});
+  CameraStreamService({
+    required this.config,
+    required this.cameraIndex,
+    this.sessionCookie,
+  });
 
   Stream<Uint8List> get stream {
     _controller ??= StreamController<Uint8List>.broadcast(
@@ -22,32 +27,47 @@ class CameraStreamService {
     return _controller!.stream;
   }
 
-  void _connect() {
+  Future<void> _connect() async {
     if (_closed) return;
     final uri = '${config.wsBaseUrl}/api/cameras/$cameraIndex/stream';
-    _channel = WebSocketChannel.connect(Uri.parse(uri));
-    _channel!.stream.listen(
-      (data) {
-        if (data is List<int> && !_closed) {
-          _controller?.add(Uint8List.fromList(data));
-        }
-      },
-      onError: (e) {
-        if (!_closed) {
-          Future.delayed(const Duration(seconds: 2), _connect);
-        }
-      },
-      onDone: () {
-        if (!_closed) {
-          Future.delayed(const Duration(seconds: 2), _connect);
-        }
-      },
-    );
+    try {
+      final headers = sessionCookie != null
+          ? {'Cookie': 'byd_session=$sessionCookie'}
+          : null;
+      final ws = await WebSocket.connect(uri, headers: headers);
+      if (_closed) {
+        ws.close();
+        return;
+      }
+      _socket = ws;
+      ws.listen(
+        (data) {
+          if (_closed) return;
+          if (data is List<int>) {
+            _controller?.add(Uint8List.fromList(data));
+          }
+        },
+        onError: (_) {
+          if (!_closed) {
+            Future.delayed(const Duration(seconds: 2), _connect);
+          }
+        },
+        onDone: () {
+          if (!_closed) {
+            Future.delayed(const Duration(seconds: 2), _connect);
+          }
+        },
+      );
+    } catch (_) {
+      if (!_closed) {
+        Future.delayed(const Duration(seconds: 2), _connect);
+      }
+    }
   }
 
   void _disconnect() {
-    _channel?.sink.close();
-    _channel = null;
+    _socket?.close();
+    _socket = null;
   }
 
   void dispose() {

@@ -6,8 +6,14 @@ import '../services/camera_stream_service.dart';
 class CameraScreen extends StatefulWidget {
   final ServerConfig config;
   final int camera; // 1-based
+  final String? sessionCookie;
 
-  const CameraScreen({super.key, required this.config, required this.camera});
+  const CameraScreen({
+    super.key,
+    required this.config,
+    required this.camera,
+    this.sessionCookie,
+  });
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();
@@ -28,7 +34,10 @@ class _CameraScreenState extends State<CameraScreen> {
   void initState() {
     super.initState();
     _stream = CameraStreamService(
-        config: widget.config, cameraIndex: widget.camera);
+      config: widget.config,
+      cameraIndex: widget.camera,
+      sessionCookie: widget.sessionCookie,
+    );
     _stream.stream.listen((frame) {
       if (mounted) {
         setState(() {

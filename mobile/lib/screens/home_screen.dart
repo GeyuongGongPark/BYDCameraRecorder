@@ -101,8 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -116,18 +115,17 @@ class _HomeScreenState extends State<HomeScreen> {
           style: const TextStyle(color: Colors.white),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          if (_system != null) _systemStatusChip(),
-        ],
+        actions: [if (_system != null) _systemStatusChip()],
       ),
       body: _loading
           ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF3DC8FF)))
+              child: CircularProgressIndicator(color: Color(0xFF3DC8FF)),
+            )
           : _error != null
-              ? _errorView()
-              : _tabIndex == 0
-                  ? _dashboardView()
-                  : FilesScreen(api: _api, state: _state),
+          ? _errorView()
+          : _tabIndex == 0
+          ? _dashboardView()
+          : FilesScreen(api: _api, state: _state),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: const Color(0xFF0A1020),
         selectedItemColor: const Color(0xFF3DC8FF),
@@ -135,10 +133,8 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: _tabIndex,
         onTap: (i) => setState(() => _tabIndex = i),
         items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard), label: '대시보드'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.folder_open), label: '파일'),
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: '대시보드'),
+          BottomNavigationBarItem(icon: Icon(Icons.folder_open), label: '파일'),
         ],
       ),
     );
@@ -158,24 +154,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _errorView() => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.signal_wifi_off,
-                size: 48, color: Colors.redAccent),
-            const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: Colors.white54)),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF143D5A)),
-              onPressed: _poll,
-              child: const Text('재시도',
-                  style: TextStyle(color: Colors.white)),
-            ),
-          ],
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.signal_wifi_off, size: 48, color: Colors.redAccent),
+        const SizedBox(height: 12),
+        Text(_error!, style: const TextStyle(color: Colors.white54)),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF143D5A),
+          ),
+          onPressed: _poll,
+          child: const Text('재시도', style: TextStyle(color: Colors.white)),
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _dashboardView() {
     final state = _state!;
@@ -197,6 +192,28 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _statusCard(RecorderState state) {
     final isRec = state.isRecording;
     final isParking = state.isParking;
+    final isEvent = state.isParkingRecording;
+    final title = isEvent
+        ? '이벤트 녹화 중'
+        : isRec
+        ? '녹화 중'
+        : isParking
+        ? '주차 감시 중'
+        : '정지';
+    final icon = isEvent
+        ? Icons.warning_amber_rounded
+        : isRec
+        ? Icons.fiber_manual_record
+        : isParking
+        ? Icons.local_parking
+        : Icons.stop_circle_outlined;
+    final color = isEvent
+        ? Colors.orangeAccent
+        : isRec
+        ? Colors.redAccent
+        : isParking
+        ? Colors.amberAccent
+        : Colors.white38;
     return Card(
       color: const Color(0xFF0D1926),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -207,37 +224,24 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Row(
               children: [
-                Icon(
-                  isRec
-                      ? Icons.fiber_manual_record
-                      : isParking
-                          ? Icons.local_parking
-                          : Icons.stop_circle_outlined,
-                  color: isRec
-                      ? Colors.redAccent
-                      : isParking
-                          ? Colors.orangeAccent
-                          : Colors.white38,
-                ),
+                Icon(icon, color: color),
                 const SizedBox(width: 8),
                 Text(
-                  isRec
-                      ? '녹화 중'
-                      : isParking
-                          ? '주차 감시 중'
-                          : '정지',
+                  title,
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
             if (state.statusMessage.isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text(state.statusMessage,
-                  style: const TextStyle(
-                      color: Colors.white54, fontSize: 12)),
+              Text(
+                state.statusMessage,
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
             ],
             const SizedBox(height: 16),
             SizedBox(
@@ -262,55 +266,60 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _cameraGrid() => GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 4 / 3,
-        ),
-        itemCount: 4,
-        itemBuilder: (ctx, i) => _cameraTile(i + 1),
-      );
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 2,
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      childAspectRatio: 4 / 3,
+    ),
+    itemCount: 4,
+    itemBuilder: (ctx, i) => _cameraTile(i + 1),
+  );
 
   Widget _cameraTile(int camera) => GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => CameraScreen(config: widget.config, camera: camera),
-          ),
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CameraScreen(
+          config: widget.config,
+          camera: camera,
+          sessionCookie: _api.sessionCookie,
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            color: const Color(0xFF0A1020),
-            child: Stack(
-              children: [
-                Center(
-                  child: Icon(Icons.videocam,
-                      size: 32, color: Colors.white.withValues(alpha: 0.2)),
-                ),
-                Positioned(
-                  bottom: 6,
-                  left: 8,
-                  child: Text(
-                    'Camera $camera',
-                    style: const TextStyle(
-                        color: Colors.white70, fontSize: 11),
-                  ),
-                ),
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: Icon(Icons.fullscreen,
-                      size: 18, color: Colors.white38),
-                ),
-              ],
+      ),
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        color: const Color(0xFF0A1020),
+        child: Stack(
+          children: [
+            Center(
+              child: Icon(
+                Icons.videocam,
+                size: 32,
+                color: Colors.white.withValues(alpha: 0.2),
+              ),
             ),
-          ),
+            Positioned(
+              bottom: 6,
+              left: 8,
+              child: Text(
+                'Camera $camera',
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+            ),
+            Positioned(
+              top: 6,
+              right: 6,
+              child: Icon(Icons.fullscreen, size: 18, color: Colors.white38),
+            ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 
   Widget _systemCard() {
     final s = _system!;
@@ -322,15 +331,20 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('시스템 상태',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold)),
+            const Text(
+              '시스템 상태',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 12),
             _statRow('CPU', '${s.cpuPercent.toStringAsFixed(1)}%'),
             _statRow('RAM', '${s.memUsedMb} / ${s.memTotalMb} MB'),
-            _statRow('배터리',
-                '${s.batteryPercent}% ${s.charging ? '(충전 중)' : ''} ${s.batteryTempC.toStringAsFixed(1)}°C'),
+            _statRow(
+              '배터리',
+              '${s.batteryPercent}% ${s.charging ? '(충전 중)' : ''} ${s.batteryTempC.toStringAsFixed(1)}°C',
+            ),
           ],
         ),
       ),
@@ -338,15 +352,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _statRow(String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label,
-                style: const TextStyle(color: Colors.white54, fontSize: 13)),
-            Text(value,
-                style: const TextStyle(color: Colors.white, fontSize: 13)),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white54, fontSize: 13),
         ),
-      );
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 13)),
+      ],
+    ),
+  );
 }

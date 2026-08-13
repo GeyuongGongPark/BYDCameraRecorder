@@ -80,6 +80,7 @@ public final class CameraRecorderService extends Service
             5_000_000_000L;
     private static final long INITIAL_RECOVERY_DELAY_MILLIS = 15_000L;
     private static final long RECOVERY_INTERVAL_MILLIS = 60_000L;
+    private static final long FIRST_RECORDING_FRAME_TIMEOUT_MILLIS = 20_000L;
     private static final String TAG = "BYDCamera";
 
     private final IBinder binder = new LocalBinder();
@@ -184,6 +185,13 @@ public final class CameraRecorderService extends Service
     private MqttPublisher mqttPublisher;
     private SystemMonitor systemMonitor;
     private CloudflaredTunnel cloudflaredTunnel;
+
+    private final Runnable recordingStartupTimeoutRunnable = new Runnable() {
+        @Override
+        public void run() {
+            onRecordingStartupTimeout();
+        }
+    };
 
     @Override
     public void onCreate() {
@@ -602,6 +610,7 @@ public final class CameraRecorderService extends Service
         pendingRecordingSettings = recordingSettings;
         lastRecordedFrameNanos = 0L;
         mode = Mode.RECORDING;
+        scheduleRecordingStartupTimeout();
         enterForeground();
         acquireWakeLock();
         frameSource.start();
@@ -635,6 +644,7 @@ public final class CameraRecorderService extends Service
             return;
         }
         pendingRecordingSettings = null;
+        cancelRecordingStartupTimeout();
         segmentRecorder.stop();
         mode = Mode.NOT_RECORDING;
         releaseWakeLock();
@@ -733,6 +743,10 @@ public final class CameraRecorderService extends Service
                     pendingRecordingSettings = null;
                 }
                 segmentRecorder.offerFrame(processed);
+                if (lastRecordedFrameNanos == 0L) {
+                    cancelRecordingStartupTimeout();
+                    publishState(describeMode());
+                }
                 lastRecordedFrameNanos = rawFrame.monotonicNanos;
                 recordRecordingPerformance(
                         recordingStartedNanos,
@@ -1031,6 +1045,7 @@ public final class CameraRecorderService extends Service
         } else {
             lastRecordedFrameNanos = 0L;
             pendingRecordingSettings = parkingRecordingSettings;
+            scheduleRecordingStartupTimeout();
             if (settings.parkingAutoLock) {
                 // 새 세그먼트가 열릴 때 자동 잠금되도록 설정
                 segmentRecorder.setAutoLockForNextSegment();
@@ -1061,6 +1076,7 @@ public final class CameraRecorderService extends Service
             segmentRecorder.stop();
         }
         pendingRecordingSettings = null;
+        cancelRecordingStartupTimeout();
         mode = Mode.PARKING_STANDBY;
         enterForeground();
         publishState("주차 감시 녹화 완료 - 대기 중");
@@ -1313,6 +1329,16 @@ public final class CameraRecorderService extends Service
         StringBuilder json = new StringBuilder();
         json.append("{\"recording\":")
                 .append(mode == Mode.RECORDING)
+                .append(",\"recordingActive\":")
+                .append(isRecordingActive())
+                .append(",\"guardActive\":")
+                .append(isParkingGuardActive())
+                .append(",\"eventRecording\":")
+                .append(mode == Mode.PARKING_RECORDING)
+                .append(",\"mode\":")
+                .append(PhoneJson.quote(mode.name()))
+                .append(",\"statusMessage\":")
+                .append(PhoneJson.quote(lastStateMessage))
                 .append(",\"backgroundAccessGranted\":")
                 .append(BackgroundAccess.isGranted(this))
                 .append(",\"backgroundAccessSupported\":")
@@ -1442,6 +1468,16 @@ public final class CameraRecorderService extends Service
     public String createPhoneStatusJson() {
         return "{\"recording\":"
                 + (mode == Mode.RECORDING)
+                + ",\"recordingActive\":"
+                + isRecordingActive()
+                + ",\"guardActive\":"
+                + isParkingGuardActive()
+                + ",\"eventRecording\":"
+                + (mode == Mode.PARKING_RECORDING)
+                + ",\"mode\":"
+                + PhoneJson.quote(mode.name())
+                + ",\"statusMessage\":"
+                + PhoneJson.quote(lastStateMessage)
                 + ",\"message\":"
                 + PhoneJson.quote(lastStateMessage)
                 + ",\"stateVersion\":"
@@ -1492,15 +1528,15 @@ public final class CameraRecorderService extends Service
                 PendingIntent.FLAG_UPDATE_CURRENT);
         String contentText;
         if (mode == Mode.RECORDING) {
-            contentText = "Recording five rolling camera videos";
+            contentText = "녹화 중";
         } else if (mode == Mode.PARKING_STANDBY) {
-            contentText = "주차 감시 중 - 충격 감지 대기";
+            contentText = "주차 감시 대기";
         } else if (mode == Mode.PARKING_RECORDING) {
-            contentText = "충격 감지! 녹화 중";
+            contentText = "이벤트 녹화 중";
         } else {
             contentText = phoneAccessServer == null
-                    ? "Phone app access needs attention"
-                    : "Phone app access is available";
+                    ? "폰 연결 확인 필요"
+                    : "폰 연결 가능";
         }
         return builder
                 .setSmallIcon(R.drawable.ic_record)
@@ -1573,6 +1609,33 @@ public final class CameraRecorderService extends Service
         }
     }
 
+    private boolean isRecordingActive() {
+        return mode == Mode.RECORDING || mode == Mode.PARKING_RECORDING;
+    }
+
+    private boolean isParkingGuardActive() {
+        return mode == Mode.PARKING_STANDBY || mode == Mode.PARKING_RECORDING;
+    }
+
+    private void scheduleRecordingStartupTimeout() {
+        mainHandler.removeCallbacks(recordingStartupTimeoutRunnable);
+        mainHandler.postDelayed(
+                recordingStartupTimeoutRunnable,
+                FIRST_RECORDING_FRAME_TIMEOUT_MILLIS);
+    }
+
+    private void cancelRecordingStartupTimeout() {
+        mainHandler.removeCallbacks(recordingStartupTimeoutRunnable);
+    }
+
+    private synchronized void onRecordingStartupTimeout() {
+        if (!isRecordingActive() || lastRecordedFrameNanos != 0L) {
+            return;
+        }
+        stopRecordingAfterFailure(new IOException(
+                "Camera did not deliver recording frames within 20 seconds"));
+    }
+
     private void enterForeground() {
         startForeground(NOTIFICATION_ID, buildNotification());
     }
@@ -1589,10 +1652,10 @@ public final class CameraRecorderService extends Service
             Notification.Builder builder = createParkingNotificationBuilder();
             Notification notification = builder
                     .setSmallIcon(R.drawable.ic_record)
-                    .setContentTitle("충격 감지!")
+                    .setContentTitle("이벤트 녹화")
                     .setContentText(
                             String.format("%.1f", gForce)
-                                    + "G 충격이 감지되어 녹화를 시작했습니다")
+                                    + "G 충격 감지")
                     .setContentIntent(pendingIntent)
                     .setAutoCancel(true)
                     .setCategory(Notification.CATEGORY_EVENT)
@@ -1670,6 +1733,7 @@ public final class CameraRecorderService extends Service
 
     private synchronized void shutdown() {
         pendingRecordingSettings = null;
+        cancelRecordingStartupTimeout();
         if (segmentRecorder != null) {
             segmentRecorder.stop();
         }
@@ -1690,6 +1754,7 @@ public final class CameraRecorderService extends Service
                         .withContinuousRecordingEnabled(false);
         settings.save(this);
         pendingRecordingSettings = null;
+        cancelRecordingStartupTimeout();
         if (segmentRecorder != null) {
             try {
                 segmentRecorder.stop();

@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../models/recorder_state.dart';
 import '../models/server_config.dart';
@@ -74,17 +76,44 @@ class ApiService {
         jsonDecode(res.body) as Map<String, dynamic>);
   }
 
-  Uri segmentPreviewUri(String segmentId) {
+  Future<Uint8List> fetchSegmentPreview(String segmentId) async {
     final encoded = Uri.encodeComponent(segmentId);
-    return Uri.parse('${config.baseUrl}/api/segments/$encoded/preview.jpg')
-        .replace(queryParameters: {'_s': _sessionCookie ?? ''});
+    final res = await _get('api/segments/$encoded/preview.jpg');
+    _requireOk(res);
+    return res.bodyBytes;
   }
 
-  Uri segmentFileUri(String segmentId, String fileName) {
+  /// 파일을 청크 단위로 스트리밍 다운로드합니다. onProgress(received, total) 호출.
+  Future<void> downloadSegmentFile(
+    String segmentId,
+    String fileName,
+    String savePath, {
+    void Function(int received, int total)? onProgress,
+  }) async {
     final encodedId = Uri.encodeComponent(segmentId);
     final encodedFile = Uri.encodeComponent(fileName);
-    return Uri.parse(
+    final uri = Uri.parse(
         '${config.baseUrl}/api/segments/$encodedId/files/$encodedFile');
+    final request = http.Request('GET', uri);
+    request.headers.addAll(_headers);
+    final client = http.Client();
+    try {
+      final response = await client.send(request);
+      if (response.statusCode != 200 && response.statusCode != 206) {
+        throw ApiException(response.statusCode, 'Download failed');
+      }
+      final total = response.contentLength ?? -1;
+      int received = 0;
+      final sink = File(savePath).openWrite();
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+        received += chunk.length;
+        onProgress?.call(received, total);
+      }
+      await sink.close();
+    } finally {
+      client.close();
+    }
   }
 
   Uri cameraJpegUri(int camera) =>

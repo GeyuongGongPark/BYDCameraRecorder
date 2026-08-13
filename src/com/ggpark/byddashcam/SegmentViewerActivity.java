@@ -3,6 +3,7 @@ package com.ggpark.byddashcam;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
+import android.content.Context;
 import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -38,6 +39,11 @@ public final class SegmentViewerActivity extends Activity {
     private PinchPanController videoZoomController;
     private VideoView videoView;
     private TextView selectedDetails;
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(LocaleHelper.onAttach(base));
+    }
 
     @Override
     protected void onCreate(Bundle state) {

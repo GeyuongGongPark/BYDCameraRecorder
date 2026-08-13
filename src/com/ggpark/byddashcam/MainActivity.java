@@ -244,9 +244,14 @@ public final class MainActivity extends Activity
                 public void onServiceDisconnected(ComponentName name) {
                     serviceBound = false;
                     recorderService = null;
-                    stateView.setText("Recorder service disconnected");
+                    stateView.setText(getString(R.string.msg_service_disconnected));
                 }
             };
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(LocaleHelper.onAttach(base));
+    }
 
     @Override
     protected void onCreate(Bundle state) {
@@ -389,13 +394,13 @@ public final class MainActivity extends Activity
         }
         String statePrefix;
         if (mode == CameraRecorderService.Mode.RECORDING) {
-            statePrefix = "RECORDING";
+            statePrefix = getString(R.string.state_recording);
         } else if (mode == CameraRecorderService.Mode.PARKING_STANDBY) {
-            statePrefix = "주차 감시 대기";
+            statePrefix = getString(R.string.state_parking_standby);
         } else if (mode == CameraRecorderService.Mode.PARKING_RECORDING) {
-            statePrefix = "주차 감시 녹화";
+            statePrefix = getString(R.string.state_parking_recording);
         } else {
-            statePrefix = "NOT RECORDING";
+            statePrefix = getString(R.string.state_not_recording);
         }
         stateView.setText(statePrefix + " — " + message);
         updateRecordingControls(mode);
@@ -412,7 +417,7 @@ public final class MainActivity extends Activity
         populateInputs();
         refreshDirectPreviewTextures();
         applyFullscreenDirectTransform();
-        showMessage("Recorder settings updated from phone");
+        showMessage(getString(R.string.msg_settings_updated_phone));
     }
 
     private View buildContentView() {
@@ -435,7 +440,7 @@ public final class MainActivity extends Activity
         titleParams.leftMargin = dp(12);
         header.addView(title, titleParams);
 
-        stateView = text("Connecting to recorder service", 16, false);
+        stateView = text(getString(R.string.connecting_to_service), 16, false);
         stateView.setTextColor(color(R.color.text_secondary));
         stateView.setGravity(Gravity.END);
         header.addView(
@@ -572,8 +577,8 @@ public final class MainActivity extends Activity
                 this,
                 R.drawable.ic_play,
                 R.drawable.ic_pause,
-                "Recording is off; tap to start",
-                "Recording is on; tap to pause");
+                getString(R.string.recording_off_label),
+                getString(R.string.recording_on_label));
         recordingToggle.setListener(
                 new IconStateToggle.Listener() {
                     @Override
@@ -602,8 +607,8 @@ public final class MainActivity extends Activity
                 this,
                 R.drawable.ic_parking,
                 R.drawable.ic_parking,
-                "주차 감시 시작",
-                "주차 감시 중 - 탭하여 종료");
+                getString(R.string.parking_start_label),
+                getString(R.string.parking_active_label));
         parkingToggle.setListener(
                 new IconStateToggle.Listener() {
                     @Override
@@ -693,7 +698,7 @@ public final class MainActivity extends Activity
         LinearLayout segmentHeader = horizontal();
         segmentHeader.setGravity(Gravity.CENTER_VERTICAL);
         segmentHeader.addView(
-                sectionTitle("Recordings"),
+                sectionTitle(getString(R.string.section_recordings)),
                 new LinearLayout.LayoutParams(
                         0,
                         ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -713,14 +718,14 @@ public final class MainActivity extends Activity
         toolbar.addView(
                 iconButton(
                         R.drawable.ic_select_all,
-                        "Select all recordings",
+                        getString(R.string.select_all),
                         IconButton.Tone.DEFAULT,
                         new View.OnClickListener() {
                             @Override
                             public void onClick(View view) {
                                 confirmSelectionAction(
-                                        "Select all recordings?",
-                                        "This selects every finalized recording shown.",
+                                        getString(R.string.confirm_select_all_title),
+                                        getString(R.string.confirm_select_all_message),
                                         new Runnable() {
                                             @Override
                                             public void run() {
@@ -735,14 +740,14 @@ public final class MainActivity extends Activity
         toolbar.addView(
                 iconButton(
                         R.drawable.ic_clear_all,
-                        "Clear recording selection",
+                        getString(R.string.clear_selection),
                         IconButton.Tone.DEFAULT,
                         new View.OnClickListener() {
                             @Override
                             public void onClick(View view) {
                                 confirmSelectionAction(
-                                        "Clear selection?",
-                                        "No recordings will be changed.",
+                                        getString(R.string.confirm_clear_title),
+                                        getString(R.string.confirm_clear_message),
                                         new Runnable() {
                                             @Override
                                             public void run() {
@@ -757,14 +762,14 @@ public final class MainActivity extends Activity
         toolbar.addView(
                 iconButton(
                         R.drawable.ic_lock,
-                        "Lock selected recordings",
+                        getString(R.string.lock_selected),
                         IconButton.Tone.LOCKED,
                         new View.OnClickListener() {
                             @Override
                             public void onClick(View view) {
                                 confirmSelectionAction(
-                                        "Lock selected recordings?",
-                                        "Locked recordings are protected from automatic cleanup.",
+                                        getString(R.string.confirm_lock_title),
+                                        getString(R.string.confirm_lock_message),
                                         new Runnable() {
                                             @Override
                                             public void run() {
@@ -779,14 +784,14 @@ public final class MainActivity extends Activity
         toolbar.addView(
                 iconButton(
                         R.drawable.ic_unlock,
-                        "Unlock selected recordings",
+                        getString(R.string.unlock_selected),
                         IconButton.Tone.DEFAULT,
                         new View.OnClickListener() {
                             @Override
                             public void onClick(View view) {
                                 confirmSelectionAction(
-                                        "Unlock selected recordings?",
-                                        "Unlocked recordings can be deleted and may be removed by automatic cleanup.",
+                                        getString(R.string.confirm_unlock_title),
+                                        getString(R.string.confirm_unlock_message),
                                         new Runnable() {
                                             @Override
                                             public void run() {
@@ -801,7 +806,7 @@ public final class MainActivity extends Activity
         toolbar.addView(
                 iconButton(
                         R.drawable.ic_delete,
-                        "Delete selected recordings",
+                        getString(R.string.delete_selected),
                         IconButton.Tone.RECORD,
                         new View.OnClickListener() {
                             @Override
@@ -817,14 +822,16 @@ public final class MainActivity extends Activity
             String title,
             String message,
             final Runnable action) {
+        boolean isDelete = title.equals(getString(R.string.confirm_delete_title));
+        boolean isLock = title.equals(getString(R.string.confirm_lock_title));
         ConfirmationDialog.show(
                 this,
                 title,
                 message,
-                "Confirm",
-                title.startsWith("Delete")
+                getString(android.R.string.ok),
+                isDelete
                         ? ConfirmationDialog.Tone.DANGER
-                        : title.startsWith("Lock")
+                        : isLock
                                 ? ConfirmationDialog.Tone.WARNING
                                 : ConfirmationDialog.Tone.DEFAULT,
                 action);
@@ -955,6 +962,70 @@ public final class MainActivity extends Activity
         return panel;
     }
 
+    private View buildLanguageSelector() {
+        LinearLayout section = vertical();
+        TextView label = text(getString(R.string.language_section), 18, true);
+        label.setPadding(0, dp(12), 0, dp(8));
+        section.addView(label);
+
+        LinearLayout buttons = horizontal();
+        final String currentLang = LocaleHelper.getLanguage(this);
+
+        TextView enLabel = text("English", 15, "en".equals(currentLang));
+        enLabel.setPadding(dp(10), 0, dp(10), 0);
+        LinearLayout enRow = horizontal();
+        enRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        enRow.setBackgroundResource("en".equals(currentLang)
+                ? R.drawable.card_selected_background
+                : R.drawable.card_background);
+        enRow.setPadding(dp(10), dp(10), dp(14), dp(10));
+        enRow.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                LocaleHelper.setLocale(MainActivity.this, "en");
+                recreate();
+            }
+        });
+        if ("en".equals(currentLang)) {
+            ImageView check = new ImageView(this);
+            check.setImageResource(R.drawable.ic_check);
+            enRow.addView(check, new LinearLayout.LayoutParams(dp(20), dp(20)));
+        }
+        enRow.addView(enLabel);
+        LinearLayout.LayoutParams enParams = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        buttons.addView(enRow, enParams);
+
+        LinearLayout.LayoutParams koParams = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        koParams.leftMargin = dp(8);
+        TextView koLabel = text("한국어", 15, "ko".equals(currentLang));
+        koLabel.setPadding(dp(10), 0, dp(10), 0);
+        LinearLayout koRow = horizontal();
+        koRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        koRow.setBackgroundResource("ko".equals(currentLang)
+                ? R.drawable.card_selected_background
+                : R.drawable.card_background);
+        koRow.setPadding(dp(10), dp(10), dp(14), dp(10));
+        koRow.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                LocaleHelper.setLocale(MainActivity.this, "ko");
+                recreate();
+            }
+        });
+        if ("ko".equals(currentLang)) {
+            ImageView check = new ImageView(this);
+            check.setImageResource(R.drawable.ic_check);
+            koRow.addView(check, new LinearLayout.LayoutParams(dp(20), dp(20)));
+        }
+        koRow.addView(koLabel);
+        buttons.addView(koRow, koParams);
+
+        section.addView(buttons);
+        return section;
+    }
+
     private View buildSettingsOverlay() {
         settingsOverlay = new FrameLayout(this);
         settingsOverlay.setBackgroundColor(Color.argb(245, 5, 11, 20));
@@ -967,7 +1038,7 @@ public final class MainActivity extends Activity
 
         LinearLayout header = horizontal();
         header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = text("Recorder settings", 24, true);
+        TextView title = text(getString(R.string.settings_title), 24, true);
         header.addView(
                 title,
                 new LinearLayout.LayoutParams(
@@ -977,7 +1048,7 @@ public final class MainActivity extends Activity
 
         settingsSaveButton = iconButton(
                 R.drawable.ic_save,
-                "Save settings",
+                getString(R.string.settings_title),
                 IconButton.Tone.SUCCESS,
                 new View.OnClickListener() {
                     @Override
@@ -992,7 +1063,7 @@ public final class MainActivity extends Activity
 
         IconButton close = iconButton(
                 R.drawable.ic_close,
-                "Close settings",
+                getString(R.string.settings_title),
                 IconButton.Tone.DEFAULT,
                 new View.OnClickListener() {
                     @Override
@@ -1006,7 +1077,7 @@ public final class MainActivity extends Activity
         panel.addView(header);
 
         TextView description = text(
-                "Changes apply to future recordings. Active recordings keep their current profile.",
+                getString(R.string.settings_description),
                 14,
                 false);
         description.setTextColor(color(R.color.text_secondary));
@@ -1019,7 +1090,11 @@ public final class MainActivity extends Activity
         fields.setPadding(dp(6), dp(4), dp(6), dp(16));
 
         fields.addView(
-                sectionTitle("Storage"),
+                buildLanguageSelector(),
+                matchWidthWrap(dp(0), dp(14)));
+
+        fields.addView(
+                sectionTitle(getString(R.string.section_storage)),
                 matchWidthWrap(dp(0), dp(8)));
         fields.addView(
                 buildStorageSummary(),
@@ -1032,8 +1107,8 @@ public final class MainActivity extends Activity
                 this,
                 R.drawable.ic_close,
                 R.drawable.ic_wifi,
-                "Phone app access is off; tap to enable",
-                "Phone app access is on; tap to disable",
+                getString(R.string.phone_access_off_toggle),
+                getString(R.string.phone_access_on_toggle),
                 false);
         phoneAccessToggle.setListener(
                 new IconStateToggle.Listener() {
@@ -1054,7 +1129,8 @@ public final class MainActivity extends Activity
         volumeSpinner = new Spinner(this);
         volumeSpinner.setBackgroundResource(R.drawable.input_background);
         fields.addView(
-                labeledField("Recording volume", volumeSpinner),
+                labeledField(getString(R.string.setting_recording_volume), volumeSpinner,
+                        R.string.help_recording_volume),
                 matchWidthWrap(dp(0), dp(10)));
 
         resolutionSpinner = new Spinner(this);
@@ -1077,13 +1153,14 @@ public final class MainActivity extends Activity
         dateFormatSpinner.setOnItemSelectedListener(
                 settingsSelectionListener(false));
         fields.addView(
-                labeledField("Date and time format", dateFormatSpinner),
+                labeledField(getString(R.string.setting_date_format), dateFormatSpinner,
+                        R.string.help_date_format),
                 matchWidthWrap(dp(0), dp(10)));
 
         fields.addView(
                 sectionTitleWithHelp(
-                        "Camera names",
-                        settingHelp("Camera names")));
+                        getString(R.string.section_camera_names),
+                        getString(R.string.help_camera_names)));
         for (int cameraIndex = 0;
                 cameraIndex < FrameProcessor.CAMERA_COUNT;
                 cameraIndex++) {
@@ -1116,19 +1193,16 @@ public final class MainActivity extends Activity
                     });
             fields.addView(
                     labeledFieldWithoutHelp(
-                            "Camera " + (cameraIndex + 1),
+                            getString(R.string.camera_number, cameraIndex + 1),
                             cameraNameInput),
                     matchWidthWrap(dp(0), dp(10)));
         }
         fields.addView(
                 sectionTitleWithHelp(
-                        "Camera orientation",
-                        "Flips a physical camera view horizontally, vertically, "
-                                + "or in both directions. The saved orientation "
-                                + "is applied consistently to live previews and "
-                                + "new individual and combined recordings."));
+                        getString(R.string.section_camera_orientation),
+                        getString(R.string.help_camera_orientation)));
         TextView orientationHelp = text(
-                "Enable either direction for each camera. Existing recordings are unchanged.",
+                getString(R.string.orientation_help),
                 13,
                 false);
         orientationHelp.setTextColor(color(R.color.text_secondary));
@@ -1140,15 +1214,10 @@ public final class MainActivity extends Activity
                 matchWidthWrap(dp(0), dp(14)));
         fields.addView(
                 sectionTitleWithHelp(
-                        "Fisheye edge crop",
-                        "Cuts one shared percentage from every edge of all four "
-                                + "cameras, then expands each remaining "
-                                + "center image to fill the frame. This reduces "
-                                + "distorted low-information fisheye edges. The "
-                                + "same transform is applied to previews and new "
-                                + "individual and combined recordings."));
+                        getString(R.string.section_fisheye_crop),
+                        getString(R.string.help_fisheye_crop)));
         TextView cropHelp = text(
-                "0% keeps the full lens. Drag the slider to preview one crop for all cameras.",
+                getString(R.string.fisheye_help),
                 13,
                 false);
         cropHelp.setTextColor(color(R.color.text_secondary));
@@ -1158,12 +1227,10 @@ public final class MainActivity extends Activity
                 matchWidthWrap(dp(0), dp(14)));
         fields.addView(
                 sectionTitleWithHelp(
-                        "Combined video layout",
-                        "Sets which camera appears in each corner of newly created "
-                                + "combined videos. Individual camera videos are "
-                                + "never reordered."));
+                        getString(R.string.section_combined_layout),
+                        getString(R.string.help_combined_layout)));
         TextView layoutHelp = text(
-                "Drag a named camera tile onto another corner to swap them.",
+                getString(R.string.combined_layout_help),
                 13,
                 false);
         layoutHelp.setTextColor(color(R.color.text_secondary));
@@ -1195,8 +1262,11 @@ public final class MainActivity extends Activity
                         new NumericStepper.ValueFormatter() {
                             @Override
                             public String format(int value) {
-                                return value
-                                        + (value == 1 ? " day" : " days");
+                                return getString(
+                                        value == 1
+                                                ? R.string.retention_day
+                                                : R.string.retention_days,
+                                        value);
                             }
                         }));
         segmentStepper = numericStepper(
@@ -1208,7 +1278,7 @@ public final class MainActivity extends Activity
                         new NumericStepper.ValueFormatter() {
                             @Override
                             public String format(int value) {
-                                return value + " min";
+                                return getString(R.string.segment_minutes, value);
                             }
                         }));
         minFreeStepper = numericStepper(
@@ -1224,29 +1294,31 @@ public final class MainActivity extends Activity
                             }
                         }));
         fields.addView(
-                labeledField("Recorder quota", quotaStepper),
+                labeledField(getString(R.string.setting_quota), quotaStepper,
+                        R.string.help_quota),
                 matchWidthWrap(dp(0), dp(10)));
         fields.addView(
-                labeledField("Retention", retentionStepper),
+                labeledField(getString(R.string.setting_retention), retentionStepper,
+                        R.string.help_retention),
                 matchWidthWrap(dp(0), dp(10)));
         fields.addView(
-                labeledField("Segment length", segmentStepper),
+                labeledField(getString(R.string.setting_segment), segmentStepper,
+                        R.string.help_segment),
                 matchWidthWrap(dp(0), dp(10)));
         fields.addView(
-                labeledField("Minimum volume free", minFreeStepper),
+                labeledField(getString(R.string.setting_min_free), minFreeStepper,
+                        R.string.help_min_free),
                 matchWidthWrap(dp(0), dp(10)));
 
         fields.addView(
                 sectionTitleWithHelp(
-                        "주차 감시 설정",
-                        "충격이 감지되면 자동으로 녹화를 시작합니다. "
-                                + "임계값이 낮을수록 작은 충격도 감지되며, "
-                                + "녹화 시간은 충격 감지 후 계속 녹화하는 시간입니다."),
+                        getString(R.string.section_parking_guard),
+                        getString(R.string.parking_guard_description)),
                 matchWidthWrap(dp(0), dp(8)));
         // 임계값은 0.5G 단위, 1.5G~5.0G → 스텝 값 = G*10 (15~50, step 5)
         parkingImpactStepper = numericStepper(
                 new NumericStepper.Specification(
-                        "충격 임계값",
+                        "Impact threshold",
                         15,  // 1.5G
                         50,  // 5.0G
                         5,   // 0.5G 단위
@@ -1258,31 +1330,33 @@ public final class MainActivity extends Activity
                         }));
         parkingDurationStepper = numericStepper(
                 new NumericStepper.Specification(
-                        "녹화 시간",
+                        "Recording duration",
                         ParkingGuardSettings.MIN_RECORDING_SECONDS,
                         ParkingGuardSettings.MAX_RECORDING_SECONDS,
                         30,
                         new NumericStepper.ValueFormatter() {
                             @Override
                             public String format(int value) {
-                                return value + "초";
+                                return getString(R.string.duration_seconds, value);
                             }
                         }));
         fields.addView(
-                labeledField("충격 임계값", parkingImpactStepper),
+                labeledFieldWithoutHelp(getString(R.string.setting_impact_threshold),
+                        parkingImpactStepper),
                 matchWidthWrap(dp(0), dp(10)));
         fields.addView(
-                labeledField("충격 후 녹화 시간", parkingDurationStepper),
+                labeledFieldWithoutHelp(getString(R.string.setting_post_impact_duration),
+                        parkingDurationStepper),
                 matchWidthWrap(dp(0), dp(10)));
 
         // ── Telegram 알림 ──────────────────────────────────────────────
         fields.addView(
                 sectionTitleWithHelp(
-                        "Telegram 알림",
-                        "충격 감지 및 주차 감시 이벤트를 Telegram 메시지로 받습니다. "
-                                + "Bot Token과 Chat ID를 설정하세요."),
+                        getString(R.string.section_telegram),
+                        getString(R.string.telegram_description)),
                 matchWidthWrap(dp(0), dp(8)));
-        telegramEnabledCheckbox = new IconCheckbox(this, "Telegram 알림 활성화");
+        telegramEnabledCheckbox = new IconCheckbox(this,
+                getString(R.string.telegram_enabled_label));
         telegramEnabledCheckbox.setListener(
                 new IconCheckbox.Listener() {
                     @Override
@@ -1291,29 +1365,29 @@ public final class MainActivity extends Activity
                     }
                 });
         fields.addView(
-                labeledFieldWithoutHelp("알림 활성화", telegramEnabledCheckbox),
+                labeledFieldWithoutHelp(getString(R.string.setting_notifications_enabled),
+                        telegramEnabledCheckbox),
                 matchWidthWrap(dp(0), dp(8)));
         telegramBotTokenInput = textInput();
         telegramBotTokenInput.setHint("Bot Token");
         telegramBotTokenInput.addTextChangedListener(settingsChangeWatcher());
         fields.addView(
-                labeledField("Bot Token", telegramBotTokenInput),
+                labeledFieldWithoutHelp("Bot Token", telegramBotTokenInput),
                 matchWidthWrap(dp(0), dp(8)));
         telegramChatIdInput = textInput();
         telegramChatIdInput.setHint("Chat ID");
         telegramChatIdInput.addTextChangedListener(settingsChangeWatcher());
         fields.addView(
-                labeledField("Chat ID", telegramChatIdInput),
+                labeledFieldWithoutHelp("Chat ID", telegramChatIdInput),
                 matchWidthWrap(dp(0), dp(10)));
 
         // ── MQTT (Home Assistant) ──────────────────────────────────────
         fields.addView(
                 sectionTitleWithHelp(
-                        "MQTT (Home Assistant)",
-                        "GPS, 배터리 상태 등을 MQTT 브로커에 발행합니다. "
-                                + "Home Assistant MQTT Discovery를 지원합니다."),
+                        getString(R.string.section_mqtt),
+                        getString(R.string.mqtt_description)),
                 matchWidthWrap(dp(0), dp(8)));
-        mqttEnabledCheckbox = new IconCheckbox(this, "MQTT 활성화");
+        mqttEnabledCheckbox = new IconCheckbox(this, getString(R.string.mqtt_enabled_label));
         mqttEnabledCheckbox.setListener(
                 new IconCheckbox.Listener() {
                     @Override
@@ -1322,17 +1396,19 @@ public final class MainActivity extends Activity
                     }
                 });
         fields.addView(
-                labeledFieldWithoutHelp("MQTT 활성화", mqttEnabledCheckbox),
+                labeledFieldWithoutHelp(getString(R.string.setting_mqtt_enabled),
+                        mqttEnabledCheckbox),
                 matchWidthWrap(dp(0), dp(8)));
         mqttHostInput = textInput();
         mqttHostInput.setHint("192.168.1.100");
         mqttHostInput.addTextChangedListener(settingsChangeWatcher());
         fields.addView(
-                labeledField("브로커 주소", mqttHostInput),
+                labeledFieldWithoutHelp(getString(R.string.setting_broker_address),
+                        mqttHostInput),
                 matchWidthWrap(dp(0), dp(8)));
         mqttPortStepper = numericStepper(
                 new NumericStepper.Specification(
-                        "포트",
+                        "Port",
                         1,
                         65535,
                         1,
@@ -1343,38 +1419,41 @@ public final class MainActivity extends Activity
                             }
                         }));
         fields.addView(
-                labeledField("포트", mqttPortStepper),
+                labeledFieldWithoutHelp(getString(R.string.setting_port), mqttPortStepper),
                 matchWidthWrap(dp(0), dp(8)));
         mqttUsernameInput = textInput();
-        mqttUsernameInput.setHint("(선택)");
+        mqttUsernameInput.setHint(getString(R.string.hint_optional));
         mqttUsernameInput.addTextChangedListener(settingsChangeWatcher());
         fields.addView(
-                labeledField("사용자 이름", mqttUsernameInput),
+                labeledFieldWithoutHelp(getString(R.string.setting_username),
+                        mqttUsernameInput),
                 matchWidthWrap(dp(0), dp(8)));
         mqttPasswordInput = textInput();
-        mqttPasswordInput.setHint("(선택)");
+        mqttPasswordInput.setHint(getString(R.string.hint_optional));
         mqttPasswordInput.setInputType(
                 android.text.InputType.TYPE_CLASS_TEXT
                         | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
         mqttPasswordInput.addTextChangedListener(settingsChangeWatcher());
         fields.addView(
-                labeledField("비밀번호", mqttPasswordInput),
+                labeledFieldWithoutHelp(getString(R.string.setting_password),
+                        mqttPasswordInput),
                 matchWidthWrap(dp(0), dp(8)));
         mqttTopicPrefixInput = textInput();
         mqttTopicPrefixInput.setHint("byd");
         mqttTopicPrefixInput.addTextChangedListener(settingsChangeWatcher());
         fields.addView(
-                labeledField("토픽 접두사", mqttTopicPrefixInput),
+                labeledFieldWithoutHelp(getString(R.string.setting_topic_prefix),
+                        mqttTopicPrefixInput),
                 matchWidthWrap(dp(0), dp(10)));
 
         // ── Cloudflare 터널 ────────────────────────────────────────────
         fields.addView(
                 sectionTitleWithHelp(
-                        "외부 접속 (Cloudflare 터널)",
-                        "인터넷을 통해 폰앱에 접속할 수 있게 합니다. "
-                                + "활성화 시 cloudflared 바이너리가 자동으로 다운로드됩니다."),
+                        getString(R.string.section_cloudflare),
+                        getString(R.string.cloudflare_description)),
                 matchWidthWrap(dp(0), dp(8)));
-        cloudflareEnabledCheckbox = new IconCheckbox(this, "Cloudflare 터널 활성화");
+        cloudflareEnabledCheckbox = new IconCheckbox(this,
+                getString(R.string.cloudflare_enabled_label));
         cloudflareEnabledCheckbox.setListener(
                 new IconCheckbox.Listener() {
                     @Override
@@ -1383,7 +1462,8 @@ public final class MainActivity extends Activity
                     }
                 });
         fields.addView(
-                labeledFieldWithoutHelp("터널 활성화", cloudflareEnabledCheckbox),
+                labeledFieldWithoutHelp(getString(R.string.setting_tunnel_enabled),
+                        cloudflareEnabledCheckbox),
                 matchWidthWrap(dp(0), dp(10)));
 
         scroll.addView(fields);
@@ -1628,7 +1708,7 @@ public final class MainActivity extends Activity
                 new LinearLayout.LayoutParams(dp(38), dp(38)));
 
         LinearLayout copy = vertical();
-        TextView title = text("Background recording access", 15, true);
+        TextView title = text(getString(R.string.background_access_title), 15, true);
         copy.addView(title);
         backgroundSettingsStatusView = text("", 13, false);
         backgroundSettingsStatusView.setTextColor(
@@ -1661,36 +1741,26 @@ public final class MainActivity extends Activity
         if (!BackgroundAccess.isRequestSupported(this)) {
             ConfirmationDialog.showInfo(
                     this,
-                    "Background recording on this system",
-                    "This BYD multimedia system does not expose Android's "
-                            + "battery-optimization exemption screen to apps. "
-                            + "Automatic startup and continued recording are not "
-                            + "verified on this system.");
+                    getString(R.string.background_access_unsupported_title),
+                    getString(R.string.background_access_unsupported_message));
             return;
         }
         if (BackgroundAccess.isGranted(this)) {
             ConfirmationDialog.showInfo(
                     this,
-                    "Background recording access",
-                    "Android battery optimization is already disabled for "
-                            + "this recorder. Recording can continue when the "
-                            + "car interface is not open. Android force-stop "
-                            + "still stops every app and cannot be bypassed.");
+                    getString(R.string.background_access_already_title),
+                    getString(R.string.background_access_already_message));
             return;
         }
-        String message =
-                "To keep recording after the car interface closes, Android "
-                        + "must exempt this recorder from battery optimization. "
-                        + "Confirm, then allow the request on the Android screen. "
-                        + "This does not override Android force-stop.";
+        String message = getString(R.string.background_access_dialog_message);
         if (automatic) {
             ConfirmationDialog.showWithOption(
                     this,
-                    "Allow background recording",
+                    getString(R.string.background_access_dialog_title),
                     message,
-                    "Open Android settings",
+                    getString(R.string.background_access_open_settings),
                     ConfirmationDialog.Tone.DEFAULT,
-                    "Don't show again",
+                    getString(R.string.background_access_suppress),
                     new ConfirmationDialog.OptionAction() {
                         @Override
                         public void run(boolean optionChecked) {
@@ -1703,9 +1773,9 @@ public final class MainActivity extends Activity
         } else {
             ConfirmationDialog.show(
                     this,
-                    "Allow background recording",
+                    getString(R.string.background_access_dialog_title),
                     message,
-                    "Open Android settings",
+                    getString(R.string.background_access_open_settings),
                     ConfirmationDialog.Tone.DEFAULT,
                     new Runnable() {
                         @Override
@@ -1726,10 +1796,10 @@ public final class MainActivity extends Activity
         if (backgroundSettingsStatusView != null) {
             backgroundSettingsStatusView.setText(
                     granted
-                            ? "Allowed by Android"
+                            ? getString(R.string.background_access_allowed)
                             : supported
-                                    ? "Battery optimization may stop background recording"
-                                    : "Unavailable on BYD; automatic startup is not verified");
+                                    ? getString(R.string.background_access_warning)
+                                    : getString(R.string.background_access_unsupported));
             backgroundSettingsStatusView.setTextColor(
                     granted
                             ? color(R.color.success)
@@ -2172,6 +2242,32 @@ public final class MainActivity extends Activity
         return row;
     }
 
+    private View labeledField(String label, View field, int helpResId) {
+        LinearLayout row = horizontal();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView labelView = text(label, 14, false);
+        labelView.setTextColor(color(R.color.text_secondary));
+        row.addView(
+                labelView,
+                new LinearLayout.LayoutParams(
+                        0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        1f));
+        row.addView(
+                field,
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(48),
+                        1f));
+        LinearLayout.LayoutParams helpParams =
+                new LinearLayout.LayoutParams(dp(42), dp(42));
+        helpParams.leftMargin = dp(8);
+        row.addView(
+                settingHelpButton(label, getString(helpResId)),
+                helpParams);
+        return row;
+    }
+
     private View labeledFieldWithoutHelp(String label, View field) {
         LinearLayout row = horizontal();
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -2565,11 +2661,11 @@ public final class MainActivity extends Activity
     private View buildStorageSummary() {
         LinearLayout summary = horizontal();
         storageAvailableView =
-                addStorageMetric(summary, "Available");
+                addStorageMetric(summary, getString(R.string.storage_available));
         storageRecorderView =
-                addStorageMetric(summary, "Recorder");
+                addStorageMetric(summary, getString(R.string.storage_recorder));
         storageLockedView =
-                addStorageMetric(summary, "Locked");
+                addStorageMetric(summary, getString(R.string.storage_locked));
         return summary;
     }
 
@@ -2580,7 +2676,7 @@ public final class MainActivity extends Activity
                 addStorageDetailCard(
                         locationRow,
                         R.drawable.ic_folder,
-                        "Recording location");
+                        getString(R.string.storage_location));
         details.addView(
                 locationRow,
                 new LinearLayout.LayoutParams(
@@ -2605,7 +2701,7 @@ public final class MainActivity extends Activity
         ImageView icon = new ImageView(this);
         icon.setImageResource(R.drawable.ic_storage);
         titleRow.addView(icon, new LinearLayout.LayoutParams(dp(30), dp(30)));
-        TextView title = text("Recording policy", 14, true);
+        TextView title = text(getString(R.string.storage_policy), 14, true);
         LinearLayout.LayoutParams titleParams =
                 new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -2617,7 +2713,12 @@ public final class MainActivity extends Activity
         LinearLayout table = horizontal();
         String[] labels =
                 new String[]{
-                    "Total", "Quota", "Retention", "Reserve", "Segment", "Resolution"
+                    getString(R.string.storage_total),
+                    getString(R.string.storage_quota_label),
+                    getString(R.string.storage_retention_label),
+                    getString(R.string.storage_reserve),
+                    getString(R.string.storage_segment),
+                    getString(R.string.storage_resolution)
                 };
         for (int index = 0; index < labels.length; index++) {
             LinearLayout cell = vertical();
@@ -2628,7 +2729,7 @@ public final class MainActivity extends Activity
             label.setTextColor(color(R.color.text_secondary));
             label.setGravity(Gravity.CENTER);
             cell.addView(label);
-            TextView value = text("Loading", 13, true);
+            TextView value = text(getString(R.string.loading), 13, true);
             value.setGravity(Gravity.CENTER);
             value.setMaxLines(index == labels.length - 1 ? 2 : 1);
             if (index == labels.length - 1) {
@@ -2673,7 +2774,7 @@ public final class MainActivity extends Activity
         TextView titleView = text(title, 14, true);
         titleView.setTextColor(color(R.color.text_primary));
         copy.addView(titleView);
-        TextView details = text("Loading", 13, false);
+        TextView details = text(getString(R.string.loading), 13, false);
         details.setTextColor(color(R.color.text_secondary));
         details.setLineSpacing(0f, 1.08f);
         LinearLayout.LayoutParams detailTextParams =
@@ -2994,7 +3095,7 @@ public final class MainActivity extends Activity
                                     .toString()
                                     .trim();
             if (name.isEmpty()) {
-                name = "Camera " + (cameraIndex + 1);
+                name = getString(R.string.camera_number, cameraIndex + 1);
             }
             tile.setText(name + "\n" + corners[position]);
         }
@@ -3013,7 +3114,7 @@ public final class MainActivity extends Activity
                                     .trim();
             String displayedName =
                     name.isEmpty()
-                            ? "Camera " + (cameraIndex + 1)
+                            ? getString(R.string.camera_number, cameraIndex + 1)
                             : name;
             TextView orientationName =
                     cameraOrientationNameViews[cameraIndex];
@@ -3041,9 +3142,9 @@ public final class MainActivity extends Activity
         card.setPadding(dp(14), dp(10), dp(14), dp(10));
 
         LinearLayout addressBlock = vertical();
-        TextView label = text("Phone app access", 15, true);
+        TextView label = text(getString(R.string.phone_access_label), 15, true);
         addressBlock.addView(label);
-        settingsPhoneUrlView = text("Phone access URL is loading", 13, true);
+        settingsPhoneUrlView = text(getString(R.string.phone_access_url_loading), 13, true);
         settingsPhoneUrlView.setTextColor(color(R.color.text_secondary));
         settingsPhoneUrlView.setTextIsSelectable(true);
         settingsPhoneUrlView.setSingleLine(true);
@@ -3113,10 +3214,8 @@ public final class MainActivity extends Activity
         helpParams.leftMargin = dp(8);
         controls.addView(
                 settingHelpButton(
-                        "Phone app access",
-                        "Allows phones on the same network to control and view the "
-                                + "recorder after PIN authorization. Turning it off "
-                                + "immediately blocks phone access."),
+                        getString(R.string.phone_access_label),
+                        getString(R.string.help_phone_access)),
                 helpParams);
         LinearLayout.LayoutParams controlsParams =
                 new LinearLayout.LayoutParams(
@@ -3134,7 +3233,7 @@ public final class MainActivity extends Activity
             return;
         }
         if (recorderService == null || !phoneAccessToggle.isChecked()) {
-            settingsPhoneUrlView.setText("Phone app access is off");
+            settingsPhoneUrlView.setText(getString(R.string.phone_access_is_off));
             settingsPhoneQrContainer.setVisibility(View.GONE);
             return;
         }
@@ -3144,7 +3243,7 @@ public final class MainActivity extends Activity
             settingsPhoneQrContainer.setVisibility(View.VISIBLE);
             PhoneAccessQrView.load(settingsPhoneQrView, url);
         } catch (IOException exception) {
-            settingsPhoneUrlView.setText("Phone app access is unavailable");
+            settingsPhoneUrlView.setText(getString(R.string.phone_access_unavailable));
             settingsPhoneQrContainer.setVisibility(View.GONE);
         }
     }
@@ -3152,22 +3251,21 @@ public final class MainActivity extends Activity
     private void confirmPhonePinRegeneration() {
         ConfirmationDialog.show(
                 this,
-                "Regenerate phone PIN?",
-                "Every connected phone will be signed out immediately "
-                        + "and must enter the new PIN.",
-                "Regenerate",
+                getString(R.string.confirm_pin_title),
+                getString(R.string.confirm_pin_message),
+                getString(R.string.action_regenerate),
                 ConfirmationDialog.Tone.WARNING,
                 new Runnable() {
                     @Override
                     public void run() {
                         if (recorderService == null) {
-                            showMessage("Recorder service is unavailable");
+                            showMessage(getString(R.string.msg_service_unavailable));
                             return;
                         }
                         String pin = recorderService.regeneratePhoneAccessPin();
                         settings = RecorderSettings.load(MainActivity.this);
                         phoneAccessPinView.setPin(pin);
-                        showMessage("Phone PIN regenerated");
+                        showMessage(getString(R.string.msg_pin_regenerated));
                     }
                 });
     }
@@ -3904,12 +4002,12 @@ public final class MainActivity extends Activity
             card.setPadding(dp(12), dp(10), dp(12), dp(10));
             card.setContentDescription(
                     segment.active
-                            ? "Active recording " + displayName
+                            ? getString(R.string.segment_active_desc, displayName)
                             : finalizing
-                                    ? "Finalizing recording " + displayName
+                                    ? getString(R.string.segment_finalizing_desc, displayName)
                                     : segment.incomplete
-                                            ? "Interrupted recording " + displayName
-                                            : "Open recording " + displayName);
+                                            ? getString(R.string.segment_incomplete_desc, displayName)
+                                            : getString(R.string.segment_open_desc, displayName));
             card.setOnClickListener(
                     new View.OnClickListener() {
                         @Override
@@ -3926,7 +4024,7 @@ public final class MainActivity extends Activity
                         @Override
                         public boolean onLongClick(View view) {
                             if (segment.active) {
-                                showMessage("The active recording cannot be selected");
+                                showMessage(getString(R.string.msg_active_cannot_select));
                                 return true;
                             }
                             selectionMode = true;
@@ -3943,19 +4041,21 @@ public final class MainActivity extends Activity
             topRow.setGravity(Gravity.CENTER_VERTICAL);
 
             String state = segment.active
-                    ? "recording now"
+                    ? getString(R.string.segment_recording_now)
                     : finalizing
-                            ? "finalizing"
-                                    + (segment.locked ? " — locked" : "")
+                            ? getString(R.string.segment_finalizing)
+                                    + (segment.locked ? getString(R.string.segment_locked_suffix) : "")
                             : segment.incomplete
-                                    ? "incomplete"
-                                            + (segment.locked ? " — locked" : "")
-                                    : segment.locked ? "locked" : "unlocked";
+                                    ? getString(R.string.segment_incomplete)
+                                            + (segment.locked ? getString(R.string.segment_locked_suffix) : "")
+                                    : segment.locked
+                                            ? getString(R.string.segment_locked_state)
+                                            : getString(R.string.segment_unlocked);
             final TextView details = text(
                     displayName
                             + "\n"
                             + (segment.active
-                                    ? "Writing files"
+                                    ? getString(R.string.writing_files)
                                     : StorageRepository.formatBytes(segment.sizeBytes))
                             + " — "
                             + state
@@ -4021,14 +4121,10 @@ public final class MainActivity extends Activity
             if (segment.active || segment.incomplete) {
                 TextView availability = text(
                         segment.active
-                                ? "Recording in progress\n"
-                                        + "Previews and file actions unlock after finalization."
+                                ? getString(R.string.recording_in_progress)
                                 : finalizing
-                                        ? "Finalizing recording — the videos are being "
-                                                + "assembled and will be available shortly."
-                                        : "Interrupted recording\n"
-                                                + "Files were not finalized. Long-press to select "
-                                                + "and delete it, or keep it for recovery.",
+                                        ? getString(R.string.finalizing_recording)
+                                        : getString(R.string.interrupted_recording),
                         12,
                         false);
                 availability.setTextColor(color(R.color.text_secondary));
@@ -4135,8 +4231,8 @@ public final class MainActivity extends Activity
             selectionMode = false;
             showMessage(
                     locked
-                            ? "Selected recordings locked"
-                            : "Selected recordings unlocked");
+                            ? getString(R.string.msg_recordings_locked)
+                            : getString(R.string.msg_recordings_unlocked));
             refreshSelectionUi();
             refreshStorage();
         } catch (IOException exception) {
@@ -4159,7 +4255,7 @@ public final class MainActivity extends Activity
             recorderService.deleteSegments(settings, directories);
             selectedRecordingPaths.clear();
             selectionMode = false;
-            showMessage("Selected recordings deleted");
+            showMessage(getString(R.string.msg_recordings_deleted));
             refreshSelectionUi();
             refreshStorage();
         } catch (IOException exception) {
@@ -4174,14 +4270,14 @@ public final class MainActivity extends Activity
                             recording.directory.getAbsolutePath())) {
                 ConfirmationDialog.showInfo(
                         this,
-                        "Unlock before deleting",
+                        getString(R.string.unlock_before_delete_title),
                         StorageRepository.LOCKED_DELETE_MESSAGE);
                 return;
             }
         }
         confirmSelectionAction(
-                "Delete selected recordings?",
-                "This permanently deletes the selected finalized recordings.",
+                getString(R.string.confirm_delete_title),
+                getString(R.string.confirm_delete_message),
                 new Runnable() {
                     @Override
                     public void run() {
@@ -4412,7 +4508,7 @@ public final class MainActivity extends Activity
                             : settings.cloudflareEnabled);
         } catch (NumberFormatException exception) {
             if (showErrors) {
-                showMessage("Enter valid numeric storage settings");
+                showMessage(getString(R.string.msg_invalid_settings));
             }
             return settings;
         }
@@ -4436,7 +4532,7 @@ public final class MainActivity extends Activity
         }
         populateInputs();
         refreshDirectPreviewTextures();
-        showMessage("Recorder settings saved");
+        showMessage(getString(R.string.msg_settings_saved));
     }
 
     private void ensureCameraPermission() {
@@ -4452,7 +4548,7 @@ public final class MainActivity extends Activity
             return true;
         }
         ensureCameraPermission();
-        showMessage("Camera permissions are required");
+        showMessage(getString(R.string.msg_camera_permission));
         return false;
     }
 
