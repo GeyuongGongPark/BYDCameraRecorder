@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>개인정보 처리 방침 — BYD 블랙박스</title>
+  <meta name="description" content="BYD 블랙박스 앱의 개인정보 처리 방침" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #050b14;
+      --surface: #0d1829;
+      --border:  #1a2f4a;
+      --accent:  #3dc8ff;
+      --text:    #f0f4fa;
+      --muted:   #7a92b0;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+    }
+
+    /* NAV */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 max(24px, 5vw);
+      height: 60px;
+      background: rgba(5,11,20,.95);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .cam-icon {
+      width: 26px; height: 26px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cam-icon svg { width: 14px; height: 14px; fill: var(--bg); }
+    .nav-back {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.88rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color .2s;
+    }
+    .nav-back:hover { color: var(--accent); }
+
+    /* CONTENT */
+    .page-wrap {
+      max-width: 760px;
+      margin: 60px auto;
+      padding: 0 max(24px, 4vw) 80px;
+    }
+
+    .page-title {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .page-date {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 48px;
+    }
+
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 40px 0 12px;
+      color: var(--accent);
+    }
+
+    p { color: var(--muted); margin-bottom: 14px; font-size: 0.95rem; }
+
+    ul {
+      list-style: none;
+      margin: 0 0 14px;
+      padding: 0;
+    }
+    ul li {
+      color: var(--muted);
+      font-size: 0.95rem;
+      padding: 6px 0 6px 20px;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+    ul li:last-child { border-bottom: none; }
+    ul li::before {
+      content: '›';
+      position: absolute;
+      left: 4px;
+      color: var(--accent);
+    }
+
+    .info-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin: 20px 0;
+    }
+    .info-box p { margin: 0; font-size: 0.9rem; }
+
+    .table-wrap { overflow-x: auto; margin: 16px 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    th {
+      background: var(--surface);
+      color: var(--accent);
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 14px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+
+    .tag-local {
+      display: inline-block;
+      background: rgba(0,229,160,.12);
+      color: #00e5a0;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 1px 7px;
+    }
+    .tag-optional {
+      display: inline-block;
+      background: rgba(251,191,36,.1);
+      color: #fbbf24;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 1px 7px;
+    }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px max(24px, 5vw);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    footer p { font-size: 0.82rem; color: var(--muted); margin: 0; }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="index.html">
+    <span class="cam-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+    </span>
+    BYD 블랙박스
+  </a>
+  <a class="nav-back" href="index.html">
+    ← 홈으로
+  </a>
+</nav>
+
+<div class="page-wrap">
+  <h1 class="page-title">개인정보 처리 방침</h1>
+  <p class="page-date">최종 수정일: 2026년 8월 13일</p>
+
+  <div class="info-box">
+    <p>BYD 블랙박스 앱은 <strong>모든 데이터를 차량 기기 내부에만 저장</strong>합니다. 외부 서버로 개인정보를 전송하지 않으며, 사용자가 직접 설정한 외부 서비스(Telegram, MQTT) 연동은 선택 사항입니다.</p>
+  </div>
+
+  <h2>1. 수집하는 정보</h2>
+  <p>앱이 기기에서 접근하는 데이터와 그 목적은 다음과 같습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>데이터 종류</th>
+          <th>목적</th>
+          <th>저장 위치</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>카메라 영상 (전·후·좌·우)</td>
+          <td>블랙박스 녹화</td>
+          <td><span class="tag-local">기기 내부</span></td>
+        </tr>
+        <tr>
+          <td>GPS 위치·속도</td>
+          <td>속도 오버레이, GPX 트랙 저장</td>
+          <td><span class="tag-local">기기 내부</span></td>
+        </tr>
+        <tr>
+          <td>가속도계 데이터</td>
+          <td>충격 감지 (주차 감시 모드)</td>
+          <td>메모리에서만 처리, 저장 안 함</td>
+        </tr>
+        <tr>
+          <td>Telegram Bot Token · Chat ID</td>
+          <td>충격/모션 감지 알림 전송</td>
+          <td><span class="tag-local">기기 내부</span> <span class="tag-optional">선택</span></td>
+        </tr>
+        <tr>
+          <td>MQTT 접속 정보 (호스트·포트·계정)</td>
+          <td>Home Assistant 등 MQTT 브로커 연동</td>
+          <td><span class="tag-local">기기 내부</span> <span class="tag-optional">선택</span></td>
+        </tr>
+        <tr>
+          <td>폰 앱 PIN</td>
+          <td>Wi-Fi 원격 접속 인증</td>
+          <td><span class="tag-local">기기 내부</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>2. 정보의 이용 및 보관</h2>
+  <ul>
+    <li>녹화 영상과 GPX 파일은 사용자가 지정한 차량 내부 저장소에만 보관됩니다.</li>
+    <li>가속도계 데이터는 충격 감지 계산에만 사용되며 저장되지 않습니다.</li>
+    <li>설정값(Telegram 토큰, MQTT 계정 등)은 Android SharedPreferences에 저장되며 앱을 제거하면 함께 삭제됩니다.</li>
+    <li>앱 개발자는 어떤 사용자 데이터에도 접근할 수 없습니다.</li>
+  </ul>
+
+  <h2>3. 제3자 서비스</h2>
+  <p>아래 서비스는 사용자가 직접 활성화한 경우에만 사용됩니다. 활성화하지 않으면 어떤 외부 연결도 발생하지 않습니다.</p>
+  <ul>
+    <li><strong>Telegram</strong> — 충격·모션 이벤트 알림 메시지를 사용자가 지정한 Chat으로 전송합니다. Telegram의 <a href="https://telegram.org/privacy" target="_blank" style="color:var(--accent)">개인정보 처리 방침</a>이 적용됩니다.</li>
+    <li><strong>MQTT 브로커</strong> — GPS, 배터리, 이벤트 데이터를 사용자가 지정한 브로커에 발행합니다. 브로커 운영자의 방침이 적용됩니다.</li>
+    <li><strong>Cloudflare Tunnel</strong> — 폰 앱 외부 접속을 위해 사용자가 활성화한 경우 cloudflared 바이너리를 다운로드합니다. Cloudflare의 <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" style="color:var(--accent)">개인정보 처리 방침</a>이 적용됩니다.</li>
+  </ul>
+
+  <h2>4. 폰 앱 원격 접속</h2>
+  <p>폰 앱(iOS/Android)이 차량 앱에 접속할 경우:</p>
+  <ul>
+    <li>접속은 동일 Wi-Fi 네트워크 또는 Cloudflare 터널을 통해 PIN 인증 후 이루어집니다.</li>
+    <li>폰으로 전송되는 데이터는 카메라 스트리밍 프리뷰와 녹화 파일 목록에 한정됩니다.</li>
+    <li>폰 앱은 별도의 계정 없이 동작하며, 서버로 어떤 데이터도 전송하지 않습니다.</li>
+  </ul>
+
+  <h2>5. 필요 권한</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>권한</th>
+          <th>사용 목적</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CAMERA</td>
+          <td>차량 내장 AVM 카메라에 접근하여 영상을 녹화합니다.</td>
+        </tr>
+        <tr>
+          <td>ACCESS_FINE_LOCATION</td>
+          <td>GPS 속도·위치 정보를 가져와 오버레이와 GPX 트랙에 사용합니다.</td>
+        </tr>
+        <tr>
+          <td>FOREGROUND_SERVICE</td>
+          <td>화면이 꺼져도 백그라운드에서 녹화를 계속하기 위해 사용합니다.</td>
+        </tr>
+        <tr>
+          <td>INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE</td>
+          <td>폰 앱 연결 및 Telegram/MQTT/Cloudflare 외부 서비스 연동에 사용합니다. (해당 기능 비활성화 시 외부 통신 없음)</td>
+        </tr>
+        <tr>
+          <td>RECEIVE_BOOT_COMPLETED</td>
+          <td>차량 시동 시 자동 녹화 시작을 위해 부팅 완료 이벤트를 수신합니다.</td>
+        </tr>
+        <tr>
+          <td>REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</td>
+          <td>백그라운드 녹화가 Android에 의해 강제 종료되지 않도록 배터리 최적화 예외를 요청합니다.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>6. 데이터 보안</h2>
+  <ul>
+    <li>녹화 영상은 차량 내부 저장소에 저장되며, 앱이 직접 생성·관리합니다.</li>
+    <li>폰 앱 접속 시 4자리 PIN 인증이 필요합니다.</li>
+    <li>Cloudflare 터널 사용 시 HTTPS로 암호화되어 전송됩니다.</li>
+    <li>앱 코드는 MIT 라이선스 하에 오픈소스로 공개되어 있어 누구나 검토할 수 있습니다.</li>
+  </ul>
+
+  <h2>7. 아동의 개인정보</h2>
+  <p>이 앱은 차량 운전자 및 탑승자를 위한 도구로, 만 14세 미만 아동을 대상으로 하지 않습니다. 아동으로부터 의도적으로 정보를 수집하지 않습니다.</p>
+
+  <h2>8. 방침 변경</h2>
+  <p>이 방침이 변경될 경우 GitHub 저장소에 업데이트된 날짜와 함께 공개합니다. 중요한 변경사항은 릴리즈 노트에 명시합니다.</p>
+
+  <h2>9. 문의</h2>
+  <p>개인정보 처리 방침에 관한 문의는 아래 채널을 이용하세요.</p>
+  <ul>
+    <li>GitHub Issues: <a href="https://github.com/GeyuongGongPark/BYDCameraRecorder/issues" target="_blank" style="color:var(--accent)">github.com/GeyuongGongPark/BYDCameraRecorder/issues</a></li>
+  </ul>
+</div>
+
+<footer>
+  <p>© 2026 BYD 블랙박스 · MIT License</p>
+  <a href="index.html">← 홈으로</a>
+</footer>
+
+</body>
+</html>

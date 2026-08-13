@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BYD 블랙박스 — BYD 차량용 블랙박스 앱</title>
-  <meta name="description" content="BYD 차량 내장 카메라를 활용한 안드로이드 블랙박스 앱. GPS 속도 오버레이, 주차 감시 모드, 4채널 360° 녹화 지원." />
+  <meta name="description" content="BYD 차량 내장 카메라를 활용한 안드로이드 블랙박스 앱. GPS 속도 오버레이, 주차 감시·모션 감지, 이벤트 프리버퍼, Telegram·MQTT 알림 지원." />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -166,6 +166,21 @@
     }
     .btn-secondary:hover { border-color: var(--accent); background: rgba(61,200,255,.06); }
 
+    /* version pill */
+    .version-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,229,160,.1);
+      border: 1px solid rgba(0,229,160,.25);
+      color: var(--accent2);
+      border-radius: 99px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      margin-top: 24px;
+    }
+
     /* hero visual */
     .hero-visual {
       display: grid;
@@ -210,9 +225,15 @@
       border-radius: 5px;
       font-variant-numeric: tabular-nums;
     }
-    .cam-combined {
-      grid-column: 1 / -1;
-      aspect-ratio: 2/1;
+    .cam-cell .event-badge {
+      position: absolute;
+      top: 8px; left: 8px;
+      background: rgba(255,107,107,.85);
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 5px;
     }
 
     /* ── FEATURES ── */
@@ -259,10 +280,12 @@
       margin-bottom: 18px;
       font-size: 1.3rem;
     }
-    .icon-blue  { background: rgba(61,200,255,.12); }
-    .icon-green { background: rgba(0,229,160,.12); }
-    .icon-red   { background: rgba(255,107,107,.12); }
-    .icon-purple{ background: rgba(167,139,250,.12); }
+    .icon-blue   { background: rgba(61,200,255,.12); }
+    .icon-green  { background: rgba(0,229,160,.12); }
+    .icon-red    { background: rgba(255,107,107,.12); }
+    .icon-purple { background: rgba(167,139,250,.12); }
+    .icon-orange { background: rgba(251,146,60,.12); }
+    .icon-yellow { background: rgba(251,191,36,.12); }
     .feature-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
     .feature-card p  { font-size: 0.9rem; color: var(--muted); line-height: 1.65; }
 
@@ -401,7 +424,7 @@
     <li><a href="#specs">사양</a></li>
     <li><a href="#compat">호환 차종</a></li>
   </ul>
-  <a class="nav-cta" href="https://github.com/GeyuongGongPark/BYDCameraRecorder/releases" target="_blank">다운로드</a>
+  <a class="nav-cta" href="https://github.com/GeyuongGongPark/BYDCameraRecorder/releases/latest" target="_blank">다운로드</a>
 </nav>
 
 <!-- HERO -->
@@ -412,11 +435,11 @@
       <h1>차량 내장 카메라로<br/><span>완전한 블랙박스</span>를</h1>
       <p class="hero-desc">
         BYD 차량의 내장 AVM 카메라를 활용한 무설치 블랙박스 앱.
-        4채널 360° 영상 녹화, GPS 속도 오버레이, 주차 감시 모드를 지원합니다.
+        4채널 360° 녹화, GPS 속도 오버레이, 이벤트 프리버퍼, Telegram·MQTT 알림을 지원합니다.
       </p>
       <div class="hero-actions">
-        <a class="btn-primary" href="https://github.com/GeyuongGongPark/BYDCameraRecorder/releases" target="_blank">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+        <a class="btn-primary" href="https://github.com/GeyuongGongPark/BYDCameraRecorder/releases/latest" target="_blank">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M5 20h14v-2H5v2zm7-18L5.33 9h3.84v4h5.66V9h3.84L12 2z"/></svg>
           APK 다운로드
         </a>
         <a class="btn-secondary" href="https://github.com/GeyuongGongPark/BYDCameraRecorder" target="_blank">
@@ -424,6 +447,7 @@
           GitHub 소스
         </a>
       </div>
+      <div class="version-pill">✦ v1.0.0 출시</div>
     </div>
     <div class="hero-visual">
       <div class="cam-cell">
@@ -436,10 +460,10 @@
         <span class="cam-label">후방</span>
         <span class="speed-badge">72 km/h</span>
       </div>
-      <div class="cam-cell">
+      <div class="cam-cell" style="border-color: rgba(255,107,107,.5);">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M4 12V8a2 2 0 0 1 2-2h1l2-2h6l2 2h1a2 2 0 0 1 2 2v4"/></svg>
         <span class="cam-label">좌측</span>
-        <span class="speed-badge">72 km/h</span>
+        <span class="event-badge">⚡ 충격</span>
       </div>
       <div class="cam-cell">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M4 12V8a2 2 0 0 1 2-2h1l2-2h6l2 2h1a2 2 0 0 1 2 2v4"/></svg>
@@ -469,8 +493,13 @@
       </div>
       <div class="feature-card">
         <div class="feature-icon icon-red">🛡️</div>
-        <h3>주차 감시 모드</h3>
-        <p>가속도계로 충격을 감지(기본 2.5G)하면 즉시 녹화를 시작합니다. 해당 세그먼트를 자동으로 잠금 처리해 덮어쓰기를 방지합니다.</p>
+        <h3>주차 감시 · 모션 감지</h3>
+        <p>가속도계(기본 2.5G)와 카메라 프레임 비교로 충격·움직임을 감지하면 즉시 녹화를 시작합니다. 감도(1~5단계) 조절 가능합니다.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-orange">⏮️</div>
+        <h3>이벤트 프리버퍼</h3>
+        <p>주차 대기 중 12초 단위 슬라이딩 버퍼를 유지합니다. 충격·모션 감지 시 직전 세그먼트를 함께 잠금 처리해 사고 전 영상을 보존합니다.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon icon-purple">🔄</div>
@@ -480,12 +509,22 @@
       <div class="feature-card">
         <div class="feature-icon icon-blue">📱</div>
         <h3>폰 앱 원격 접속</h3>
-        <p>같은 Wi-Fi 네트워크의 스마트폰에서 실시간 프리뷰 확인과 영상 다운로드가 가능합니다.</p>
+        <p>같은 Wi-Fi의 iOS·Android 폰에서 실시간 카메라 프리뷰, 영상 다운로드, 주차 감시 토글이 가능합니다. Cloudflare 터널로 외부 접속도 지원합니다.</p>
       </div>
       <div class="feature-card">
-        <div class="feature-icon icon-green">⚡</div>
+        <div class="feature-icon icon-yellow">🔔</div>
+        <h3>Telegram 알림</h3>
+        <p>충격·모션 감지 시 Telegram 봇으로 즉시 알림을 받습니다. Bot Token과 Chat ID만 입력하면 설정 완료입니다.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-green">🏠</div>
+        <h3>MQTT · Home Assistant</h3>
+        <p>GPS, 배터리, 충격 이벤트를 MQTT 브로커에 발행합니다. Home Assistant MQTT Discovery를 지원해 자동으로 센서가 등록됩니다.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-blue">⚡</div>
         <h3>차량 시동 시 자동 시작</h3>
-        <p>BOOT_COMPLETED 브로드캐스트를 수신해 차량 켜지면 자동으로 녹화를 시작합니다. 별도 조작이 필요 없습니다.</p>
+        <p>BOOT_COMPLETED 브로드캐스트를 수신해 차량이 켜지면 자동으로 녹화를 시작합니다. 별도 조작이 필요 없습니다.</p>
       </div>
     </div>
   </div>
@@ -495,7 +534,7 @@
 <section id="how" style="background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
   <div class="container">
     <div class="section-tag">사용 방법</div>
-    <h2>설치부터 녹화까지 3단계</h2>
+    <h2>설치부터 녹화까지 4단계</h2>
     <p class="section-sub">별도 하드웨어 설치 없이 APK 설치만으로 바로 사용할 수 있습니다.</p>
     <div class="steps">
       <div class="step">
@@ -505,18 +544,18 @@
       </div>
       <div class="step">
         <div class="step-num">2</div>
-        <h3>카메라 권한 허용</h3>
+        <h3>권한 허용</h3>
         <p>앱 최초 실행 시 카메라 및 위치 권한을 허용합니다. 저장 경로와 녹화 시간 등을 설정합니다.</p>
       </div>
       <div class="step">
         <div class="step-num">3</div>
         <h3>자동 녹화 시작</h3>
-        <p>차량 시동을 켜면 자동으로 녹화가 시작됩니다. 주차 후 감시 모드를 켜면 충격 감지 시 자동 녹화됩니다.</p>
+        <p>차량 시동을 켜면 자동으로 녹화가 시작됩니다. 주차 후 감시 모드를 켜면 충격·모션 감지 시 자동 녹화됩니다.</p>
       </div>
       <div class="step">
         <div class="step-num">4</div>
-        <h3>영상 확인</h3>
-        <p>앱 내 녹화 목록에서 재생하거나 폰 앱으로 Wi-Fi 전송해 확인합니다. 잠금 설정으로 덮어쓰기를 방지하세요.</p>
+        <h3>폰으로 확인</h3>
+        <p>폰 앱으로 Wi-Fi 접속해 실시간 프리뷰와 이벤트 영상을 확인합니다. Telegram으로 충격 알림도 받을 수 있습니다.</p>
       </div>
     </div>
   </div>
@@ -529,6 +568,10 @@
     <h2>앱 스펙</h2>
     <p class="section-sub" style="margin-bottom: 40px;">BYD 차량 내장 AVMCamera API 기반으로 구현되었습니다.</p>
     <div class="specs-grid">
+      <div class="spec-item">
+        <div class="spec-label">버전</div>
+        <div class="spec-value"><span>v1.0.0</span></div>
+      </div>
       <div class="spec-item">
         <div class="spec-label">카메라 수</div>
         <div class="spec-value"><span>4</span>채널 동시 녹화</div>
@@ -558,8 +601,16 @@
         <div class="spec-value"><span>1.5–5.0G</span> 설정 가능</div>
       </div>
       <div class="spec-item">
+        <div class="spec-label">프리버퍼</div>
+        <div class="spec-value"><span>12초</span> 슬라이딩 윈도우</div>
+      </div>
+      <div class="spec-item">
         <div class="spec-label">최소 Android</div>
         <div class="spec-value">API <span>23</span> (6.0)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-label">라이선스</div>
+        <div class="spec-value"><span>MIT</span> 오픈소스</div>
       </div>
     </div>
   </div>
@@ -614,11 +665,11 @@
 <!-- CTA -->
 <section class="cta-section">
   <div class="container">
-    <div class="section-tag" style="text-align:center">오픈소스</div>
+    <div class="section-tag" style="text-align:center">오픈소스 · 무료</div>
     <h2>지금 바로 시작하세요</h2>
-    <p>무료 오픈소스 프로젝트입니다. APK를 설치하거나 소스 코드를 포크해 커스터마이즈할 수 있습니다.</p>
+    <p>v1.0.0이 출시되었습니다. APK를 설치하거나 소스 코드를 포크해 커스터마이즈할 수 있습니다.</p>
     <div class="cta-actions">
-      <a class="btn-primary" href="https://github.com/GeyuongGongPark/BYDCameraRecorder/releases" target="_blank">
+      <a class="btn-primary" href="https://github.com/GeyuongGongPark/BYDCameraRecorder/releases/latest" target="_blank">
         APK 다운로드
       </a>
       <a class="btn-secondary" href="https://github.com/GeyuongGongPark/BYDCameraRecorder" target="_blank">
@@ -633,6 +684,7 @@
   <p>© 2026 BYD 블랙박스 · MIT License · <a href="https://github.com/GeyuongGongPark/BYDCameraRecorder" target="_blank">GitHub</a></p>
   <div class="footer-links">
     <a href="https://github.com/GeyuongGongPark/BYDCameraRecorder/issues" target="_blank">버그 신고</a>
+    <a href="privacy.html">개인정보 처리 방침</a>
     <a href="https://github.com/GeyuongGongPark/BYDCameraRecorder/blob/main/README.md" target="_blank">README</a>
   </div>
 </footer>
