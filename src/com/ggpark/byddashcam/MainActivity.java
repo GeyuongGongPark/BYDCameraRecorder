@@ -183,6 +183,8 @@ public final class MainActivity extends Activity
     private NumericStepper parkingImpactStepper;
     private NumericStepper parkingDurationStepper;
     private IconCheckbox parkingAutoLockCheckbox;
+    private IconCheckbox cameraMotionEnabledCheckbox;
+    private NumericStepper cameraMotionSensitivityStepper;
     private IconCheckbox telegramEnabledCheckbox;
     private EditText telegramBotTokenInput;
     private EditText telegramChatIdInput;
@@ -1361,6 +1363,34 @@ public final class MainActivity extends Activity
         fields.addView(
                 labeledField(getString(R.string.setting_parking_auto_lock),
                         parkingAutoLockCheckbox, R.string.help_parking_auto_lock),
+                matchWidthWrap(dp(0), dp(10)));
+
+        cameraMotionEnabledCheckbox = new IconCheckbox(this,
+                getString(R.string.camera_motion_enabled_label));
+        cameraMotionEnabledCheckbox.setListener(
+                new IconCheckbox.Listener() {
+                    @Override
+                    public void onCheckedChanged(boolean checked) {
+                        updateSettingsSaveState();
+                    }
+                });
+        fields.addView(
+                labeledField(getString(R.string.setting_camera_motion_enabled),
+                        cameraMotionEnabledCheckbox, R.string.help_camera_motion),
+                matchWidthWrap(dp(0), dp(10)));
+        cameraMotionSensitivityStepper = numericStepper(
+                new NumericStepper.Specification(
+                        "Motion sensitivity",
+                        1, 5, 1,
+                        new NumericStepper.ValueFormatter() {
+                            @Override
+                            public String format(int value) {
+                                return String.valueOf(value);
+                            }
+                        }));
+        fields.addView(
+                labeledFieldWithoutHelp(getString(R.string.setting_camera_motion_sensitivity),
+                        cameraMotionSensitivityStepper),
                 matchWidthWrap(dp(0), dp(10)));
 
         // ── Telegram 알림 ──────────────────────────────────────────────
@@ -3484,6 +3514,12 @@ public final class MainActivity extends Activity
         if (parkingAutoLockCheckbox != null) {
             parkingAutoLockCheckbox.setChecked(settings.parkingAutoLock);
         }
+        if (cameraMotionEnabledCheckbox != null) {
+            cameraMotionEnabledCheckbox.setChecked(settings.cameraMotionEnabled);
+        }
+        if (cameraMotionSensitivityStepper != null) {
+            cameraMotionSensitivityStepper.setValue(settings.cameraMotionSensitivity);
+        }
         if (telegramEnabledCheckbox != null) {
             telegramEnabledCheckbox.setChecked(settings.telegramEnabled);
         }
@@ -3684,7 +3720,9 @@ public final class MainActivity extends Activity
                 && left.mqttUsername.equals(right.mqttUsername)
                 && left.mqttPassword.equals(right.mqttPassword)
                 && left.mqttTopicPrefix.equals(right.mqttTopicPrefix)
-                && left.cloudflareEnabled == right.cloudflareEnabled;
+                && left.cloudflareEnabled == right.cloudflareEnabled
+                && left.cameraMotionEnabled == right.cameraMotionEnabled
+                && left.cameraMotionSensitivity == right.cameraMotionSensitivity;
     }
 
     private void refreshStorage() {
@@ -4524,7 +4562,13 @@ public final class MainActivity extends Activity
                             : settings.mqttTopicPrefix,
                     cloudflareEnabledCheckbox != null
                             ? cloudflareEnabledCheckbox.isChecked()
-                            : settings.cloudflareEnabled);
+                            : settings.cloudflareEnabled,
+                    cameraMotionEnabledCheckbox != null
+                            ? cameraMotionEnabledCheckbox.isChecked()
+                            : settings.cameraMotionEnabled,
+                    cameraMotionSensitivityStepper != null
+                            ? cameraMotionSensitivityStepper.getValue()
+                            : settings.cameraMotionSensitivity);
         } catch (NumberFormatException exception) {
             if (showErrors) {
                 showMessage(getString(R.string.msg_invalid_settings));

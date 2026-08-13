@@ -14,11 +14,15 @@ public final class ParkingGuardSettings {
     public final float impactThresholdG;
     public final int recordingSeconds;
     public final boolean autoLockSegment;
+    public final boolean cameraMotionEnabled;
+    public final int cameraMotionSensitivity;
 
     public ParkingGuardSettings(
             float impactThresholdG,
             int recordingSeconds,
-            boolean autoLockSegment) {
+            boolean autoLockSegment,
+            boolean cameraMotionEnabled,
+            int cameraMotionSensitivity) {
         this.impactThresholdG = clampFloat(
                 impactThresholdG,
                 MIN_IMPACT_THRESHOLD_G,
@@ -28,6 +32,8 @@ public final class ParkingGuardSettings {
                 MIN_RECORDING_SECONDS,
                 MAX_RECORDING_SECONDS);
         this.autoLockSegment = autoLockSegment;
+        this.cameraMotionEnabled = cameraMotionEnabled;
+        this.cameraMotionSensitivity = clamp(cameraMotionSensitivity, 1, 5);
     }
 
     private static float clampFloat(float value, float min, float max) {

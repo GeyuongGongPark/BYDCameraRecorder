@@ -50,6 +50,8 @@ public final class RecorderSettings {
     private static final String KEY_MQTT_PASSWORD = "mqtt_password";
     private static final String KEY_MQTT_TOPIC_PREFIX = "mqtt_topic_prefix";
     private static final String KEY_CLOUDFLARE_ENABLED = "cloudflare_enabled";
+    private static final String KEY_CAMERA_MOTION_ENABLED = "camera_motion_enabled";
+    private static final String KEY_CAMERA_MOTION_SENSITIVITY = "camera_motion_sensitivity";
 
     public static final int DEFAULT_FISHEYE_CROP_PERCENT = 15;
     public static final int DEFAULT_MIN_FREE_PERCENT = 5;
@@ -104,6 +106,8 @@ public final class RecorderSettings {
     public final String mqttPassword;
     public final String mqttTopicPrefix;
     public final boolean cloudflareEnabled;
+    public final boolean cameraMotionEnabled;
+    public final int cameraMotionSensitivity;
 
     public RecorderSettings(
             int volumeIndex,
@@ -140,7 +144,9 @@ public final class RecorderSettings {
             String mqttUsername,
             String mqttPassword,
             String mqttTopicPrefix,
-            boolean cloudflareEnabled) {
+            boolean cloudflareEnabled,
+            boolean cameraMotionEnabled,
+            int cameraMotionSensitivity) {
         this.volumeIndex = Math.max(0, volumeIndex);
         this.quotaBytes = clampLong(
                 quotaBytes,
@@ -204,6 +210,8 @@ public final class RecorderSettings {
         this.mqttPassword = mqttPassword == null ? "" : mqttPassword;
         this.mqttTopicPrefix = mqttTopicPrefix == null ? "byd" : mqttTopicPrefix;
         this.cloudflareEnabled = cloudflareEnabled;
+        this.cameraMotionEnabled = cameraMotionEnabled;
+        this.cameraMotionSensitivity = clamp(cameraMotionSensitivity, 1, 5);
     }
 
     public static RecorderSettings load(Context context) {
@@ -262,7 +270,9 @@ public final class RecorderSettings {
                 preferences.getString(KEY_MQTT_USERNAME, ""),
                 preferences.getString(KEY_MQTT_PASSWORD, ""),
                 preferences.getString(KEY_MQTT_TOPIC_PREFIX, "byd"),
-                preferences.getBoolean(KEY_CLOUDFLARE_ENABLED, false));
+                preferences.getBoolean(KEY_CLOUDFLARE_ENABLED, false),
+                preferences.getBoolean(KEY_CAMERA_MOTION_ENABLED, false),
+                preferences.getInt(KEY_CAMERA_MOTION_SENSITIVITY, 3));
     }
 
     public void save(Context context) {
@@ -303,7 +313,9 @@ public final class RecorderSettings {
                 .putString(KEY_MQTT_USERNAME, mqttUsername)
                 .putString(KEY_MQTT_PASSWORD, mqttPassword)
                 .putString(KEY_MQTT_TOPIC_PREFIX, mqttTopicPrefix)
-                .putBoolean(KEY_CLOUDFLARE_ENABLED, cloudflareEnabled);
+                .putBoolean(KEY_CLOUDFLARE_ENABLED, cloudflareEnabled)
+                .putBoolean(KEY_CAMERA_MOTION_ENABLED, cameraMotionEnabled)
+                .putInt(KEY_CAMERA_MOTION_SENSITIVITY, cameraMotionSensitivity);
         for (int index = 0; index < cameraNames.length; index++) {
             editor.putString(KEY_CAMERA_NAME_PREFIX + index, cameraNames[index]);
             editor.putInt(
@@ -401,7 +413,9 @@ public final class RecorderSettings {
                 mqttUsername,
                 mqttPassword,
                 mqttTopicPrefix,
-                cloudflareEnabled);
+                cloudflareEnabled,
+                cameraMotionEnabled,
+                cameraMotionSensitivity);
     }
 
     public RecorderSettings withPhoneAccess(
@@ -443,7 +457,9 @@ public final class RecorderSettings {
                 mqttUsername,
                 mqttPassword,
                 mqttTopicPrefix,
-                cloudflareEnabled);
+                cloudflareEnabled,
+                cameraMotionEnabled,
+                cameraMotionSensitivity);
     }
 
     public RecorderSettings withPhoneAccessPin(String accessPin) {
@@ -482,7 +498,9 @@ public final class RecorderSettings {
                 mqttUsername,
                 mqttPassword,
                 mqttTopicPrefix,
-                cloudflareEnabled);
+                cloudflareEnabled,
+                cameraMotionEnabled,
+                cameraMotionSensitivity);
     }
 
     public RecorderSettings withVehicleModelId(String newModelId) {
@@ -521,7 +539,9 @@ public final class RecorderSettings {
                 mqttUsername,
                 mqttPassword,
                 mqttTopicPrefix,
-                cloudflareEnabled);
+                cloudflareEnabled,
+                cameraMotionEnabled,
+                cameraMotionSensitivity);
     }
 
     private static String defaultCameraName(int cameraIndex) {

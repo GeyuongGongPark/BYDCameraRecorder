@@ -755,6 +755,11 @@ public final class CameraRecorderService extends Service
                         recordingStartedNanos,
                         System.nanoTime());
             }
+            // PARKING_STANDBY 중 카메라 모션 감지 (rawFrame의 Y채널 직접 사용)
+            if (currentMode == Mode.PARKING_STANDBY && parkingGuardController != null) {
+                parkingGuardController.offerCameraFrame(
+                        rawFrame.data, rawFrame.width, rawFrame.height);
+            }
         } catch (Throwable throwable) {
             Log.e(TAG, "Recording frame processing failed", throwable);
             stopRecordingAfterFailure(throwable);
@@ -1001,13 +1006,19 @@ public final class CameraRecorderService extends Service
         ParkingGuardSettings parkingSettings = new ParkingGuardSettings(
                 settings.parkingImpactThresholdG,
                 settings.parkingRecordingSeconds,
-                settings.parkingAutoLock);
+                settings.parkingAutoLock,
+                settings.cameraMotionEnabled,
+                settings.cameraMotionSensitivity);
         parkingGuardController = new ParkingGuardController(
                 this,
                 new ParkingGuardController.Callback() {
                     @Override
                     public void onImpactRecordingStarted(float gForce) {
                         handleImpactRecordingStarted(gForce);
+                    }
+                    @Override
+                    public void onMotionRecordingStarted() {
+                        handleMotionRecordingStarted();
                     }
                     @Override
                     public void onImpactRecordingStopped() {
@@ -1095,6 +1106,55 @@ public final class CameraRecorderService extends Service
             mqttPublisher.publish(prefix + "/state", "parking_recording");
         }
         publishState("충격 감지: " + String.format("%.1f", gForce) + "G - 녹화 시작");
+    }
+
+    private synchronized void handleMotionRecordingStarted() {
+        if (mode != Mode.PARKING_STANDBY) {
+            return;
+        }
+        Log.i(TAG, "Parking camera motion detected - starting recording");
+        mode = Mode.PARKING_RECORDING;
+        RecorderSettings settings = RecorderSettings.load(this);
+        segmentRecorder.setEventMetadata("motion", 0f);
+        if (segmentRecorder.isStarted()) {
+            List<File> preBufferDirs = segmentRecorder.getAndClearPreBufferDirs();
+            if (settings.parkingAutoLock) {
+                for (File dir : preBufferDirs) {
+                    try {
+                        storageRepository.setLocked(settings, dir, true);
+                        Log.i(TAG, "Pre-buffer dir locked (motion): " + dir.getName());
+                    } catch (IOException e) {
+                        Log.w(TAG, "Failed to lock pre-buffer dir: " + dir.getName(), e);
+                    }
+                }
+                segmentRecorder.setAutoLockForNextSegment();
+            }
+            try {
+                segmentRecorder.rotateNow(false);
+            } catch (IOException exception) {
+                Log.e(TAG, "Motion recording rotate failed", exception);
+            }
+        } else {
+            RecorderSettings parkingRecordingSettings =
+                    settings.withContinuousRecordingEnabled(false);
+            lastRecordedFrameNanos = 0L;
+            pendingRecordingSettings = parkingRecordingSettings;
+            scheduleRecordingStartupTimeout();
+            if (settings.parkingAutoLock) {
+                segmentRecorder.setAutoLockForNextSegment();
+            }
+        }
+        enterForeground();
+        if (telegramNotifier != null) {
+            telegramNotifier.send("📹 모션 감지: 주차 녹화 시작");
+        }
+        if (mqttPublisher != null) {
+            RecorderSettings s = RecorderSettings.load(this);
+            String prefix = s.mqttTopicPrefix;
+            mqttPublisher.publish(prefix + "/parking/motion", "{\"detected\":true}");
+            mqttPublisher.publish(prefix + "/state", "parking_recording");
+        }
+        publishState("모션 감지 - 주차 녹화 시작");
     }
 
     private synchronized void handleImpactRecordingStopped() {
@@ -1279,7 +1339,9 @@ public final class CameraRecorderService extends Service
                 PhoneJson.stringValue(json, "mqttUsername", current.mqttUsername),
                 PhoneJson.stringValue(json, "mqttPassword", current.mqttPassword),
                 PhoneJson.stringValue(json, "mqttTopicPrefix", current.mqttTopicPrefix),
-                PhoneJson.booleanValue(json, "cloudflareEnabled", current.cloudflareEnabled));
+                PhoneJson.booleanValue(json, "cloudflareEnabled", current.cloudflareEnabled),
+                current.cameraMotionEnabled,
+                current.cameraMotionSensitivity);
         updated.save(this);
         applyRecorderSettings(updated);
         publishSettingsChanged();

@@ -91,6 +91,10 @@
     <string name="setting_parking_auto_lock">Auto-lock event segments</string>
     <string name="parking_auto_lock_label">Auto-lock enabled</string>
     <string name="help_parking_auto_lock">Automatically locks the captured event segment and the pre-impact buffer so they are protected from automatic cleanup.</string>
+    <string name="setting_camera_motion_enabled">Camera motion detection</string>
+    <string name="camera_motion_enabled_label">Motion detection enabled</string>
+    <string name="setting_camera_motion_sensitivity">Motion sensitivity (1=sensitive, 5=low)</string>
+    <string name="help_camera_motion">Triggers recording when movement is detected in the camera image. Uses frame-by-frame comparison while in parking standby. Sensitivity 1 detects small movements; 5 requires large changes. May trigger on lighting changes.</string>
     <string name="duration_seconds">%d sec</string>
 
     <!-- Notifications -->
