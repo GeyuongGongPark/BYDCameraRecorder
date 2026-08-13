@@ -7,7 +7,7 @@ BYD 차량의 내장 AVM 카메라를 활용한 안드로이드 블랙박스 앱
 - **4채널 360° 녹화** — 전/후/좌/우 카메라를 동시에 H.264로 인코딩
 - **GPS/속도 오버레이** — 영상에 속도·좌표·시각 실시간 합성, GPX 트랙 저장
 - **주차 감시 모드** — 가속도 센서로 충격 감지 시 자동 녹화·세그먼트 잠금
-- **스마트폰 원격 접속** — 차량 Wi-Fi로 연결 후 브라우저에서 영상 확인 및 다운로드
+- **스마트폰 원격 접속** — 차량 Wi-Fi로 연결 후 브라우저 또는 Flutter 앱에서 영상 확인 및 다운로드
 - **세그먼트 자동 관리** — 용량 초과 시 오래된 세그먼트 자동 삭제 (잠금 영상 보호)
 
 ## 호환 차종
@@ -83,7 +83,8 @@ src/                  Java 소스
   ParkingGuardController 주차 감시 상태 머신
   PhoneAccessServer     스마트폰 Wi-Fi 접속 서버
   VehicleProfileRegistry 차량 모델 자동 감지
-phone-ui/             스마트폰 원격 접속 UI (Vite)
+phone-ui/             스마트폰 원격 접속 웹 UI (Vite)
+mobile/               스마트폰 앱 (Flutter)
 res/                  Android 리소스
 assets/               정적 에셋 (phone UI 번들 포함)
 stubs/                AVMCamera API 스텁 (컴파일용)
