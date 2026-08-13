@@ -85,10 +85,11 @@ jobs:
 
       # ── GitHub Release ─────────────────────────────────────────────────
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: ${{ github.ref_name }}
-          generate_release_notes: true
-          files: |
-            build/BYD블랙박스-차량용-${{ github.ref_name }}.apk
-            build/BYD블랙박스-폰앱-${{ github.ref_name }}.apk
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --generate-notes \
+            --title "${{ github.ref_name }}" \
+            "build/BYD블랙박스-차량용-${{ github.ref_name }}.apk" \
+            "build/BYD블랙박스-폰앱-${{ github.ref_name }}.apk"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
