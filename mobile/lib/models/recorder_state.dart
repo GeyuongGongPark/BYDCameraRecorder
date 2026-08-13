@@ -4,6 +4,9 @@ class Segment {
   final bool locked;
   final bool active;
   final List<String> files;
+  final String? eventType;   // 'impact' | 'motion' | null
+  final double gForce;
+  final bool isPreBuffer;
 
   const Segment({
     required this.id,
@@ -11,7 +14,13 @@ class Segment {
     required this.locked,
     required this.active,
     required this.files,
+    this.eventType,
+    this.gForce = 0.0,
+    this.isPreBuffer = false,
   });
+
+  /// 이벤트 세그먼트 (충격/모션 감지 녹화, 프리버퍼 제외)
+  bool get isEvent => eventType != null && !isPreBuffer;
 
   factory Segment.fromJson(Map<String, dynamic> json) => Segment(
     id: json['id'] as String? ?? '',
@@ -21,6 +30,9 @@ class Segment {
     files:
         (json['files'] as List<dynamic>?)?.map((e) => e as String).toList() ??
         [],
+    eventType: json['eventType'] as String?,
+    gForce: (json['gForce'] as num?)?.toDouble() ?? 0.0,
+    isPreBuffer: json['isPreBuffer'] as bool? ?? false,
   );
 }
 

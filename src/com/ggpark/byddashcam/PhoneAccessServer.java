@@ -337,6 +337,12 @@ public final class PhoneAccessServer implements Closeable {
             sendJson(output, 200, service.createPhoneStateJson());
             return;
         }
+        if (relativePath.equals("api/parking") && request.method.equals("POST")) {
+            boolean enabled = jsonBoolean(request.body, "enabled", false);
+            service.setParkingFromPhone(enabled);
+            sendJson(output, 200, service.createPhoneStateJson());
+            return;
+        }
         if (relativePath.equals("api/settings") && request.method.equals("POST")) {
             service.saveSettingsFromPhone(request.body);
             Log.i(TAG, "Phone settings request applied");

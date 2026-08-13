@@ -1,0 +1,69 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js (phone-ui)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: phone-ui/package-lock.json
+
+      - name: Build phone-ui
+        run: npm --prefix phone-ui ci && npm --prefix phone-ui run build
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build APK (debug)
+        run: ./build.sh
+        env:
+          BYD_CAMERA_SIGNING_MODE: debug
+
+      # ── Release signing (optional) ──────────────────────────────────────
+      # To enable release signing:
+      # 1. Generate a keystore: keytool -genkeypair -keystore byd-camera-release.jks ...
+      # 2. Add GitHub Secrets:
+      #      RELEASE_KEYSTORE_BASE64  (base64-encoded .jks)
+      #      RELEASE_KEYSTORE_PASSWORD
+      # 3. Uncomment the steps below and comment out the debug build above.
+      #
+      # - name: Prepare release keystore
+      #   if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+      #   run: |
+      #     mkdir -p ${GITHUB_WORKSPACE}_build_secret
+      #     echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d \
+      #       > ${GITHUB_WORKSPACE}_build_secret/byd-camera-release.jks
+      #     echo "${{ secrets.RELEASE_KEYSTORE_PASSWORD }}" \
+      #       > ${GITHUB_WORKSPACE}_build_secret/byd-camera-release.password
+      #
+      # - name: Build APK (release)
+      #   run: ./build.sh
+      #   env:
+      #     BYD_CAMERA_SIGNING_MODE: release
+      #     BYD_CAMERA_RELEASE_SIGNING_DIR: ${{ github.workspace }}_build_secret
+
+      - name: Extract version from tag
+        id: version
+        run: echo "name=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.version.outputs.name }}
+          generate_release_notes: true
+          files: build/byd-dashcam-debug.apk

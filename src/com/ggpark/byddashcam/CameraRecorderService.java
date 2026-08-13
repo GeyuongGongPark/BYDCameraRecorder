@@ -1203,6 +1203,18 @@ public final class CameraRecorderService extends Service
         return settings.phoneAccessPin;
     }
 
+    public synchronized void setParkingFromPhone(boolean enabled) {
+        if (enabled) {
+            if (!isParkingGuardActive()) {
+                enterParkingMode();
+            }
+        } else {
+            if (isParkingGuardActive()) {
+                exitParkingMode();
+            }
+        }
+    }
+
     public void setRecordingFromPhone(boolean enabled) throws IOException {
         RecorderSettings settings =
                 RecorderSettings.load(this)
@@ -1952,6 +1964,40 @@ public final class CameraRecorderService extends Service
                         .append('}');
             }
         }
+        // segment.json에서 이벤트 메타데이터 읽기 (충격/모션 감지 정보)
+        String eventType = null;
+        float gForce = 0f;
+        boolean isPreBuffer = false;
+        if (!segment.active) {
+            File metaFile = new File(segment.directory, "segment.json");
+            if (metaFile.exists()) {
+                try {
+                    StringBuilder sb = new StringBuilder();
+                    java.io.BufferedReader reader =
+                            new java.io.BufferedReader(
+                                    new java.io.FileReader(metaFile));
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    reader.close();
+                    String meta = sb.toString();
+                    String rawEventType = PhoneJson.stringValue(meta, "eventType", null);
+                    if (rawEventType != null && !rawEventType.equals("null")) {
+                        eventType = rawEventType;
+                    }
+                    gForce = (float) PhoneJson.doubleValue(meta, "gForce", 0.0);
+                    isPreBuffer = PhoneJson.booleanValue(meta, "isPreBuffer", false);
+                } catch (java.io.IOException ignored) {
+                }
+            }
+        }
+        json.append(",\"eventType\":")
+                .append(eventType != null ? PhoneJson.quote(eventType) : "null")
+                .append(",\"gForce\":")
+                .append(gForce)
+                .append(",\"isPreBuffer\":")
+                .append(isPreBuffer);
         json.append("]}");
     }
 

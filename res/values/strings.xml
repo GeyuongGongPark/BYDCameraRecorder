@@ -198,6 +198,24 @@
     <string name="help_combined_layout">Sets which camera appears in each corner of newly created combined videos. Individual camera videos are never reordered.</string>
     <string name="help_default">Controls this recorder setting.</string>
 
+    <!-- GPS overlay -->
+    <string name="section_gps_overlay">GPS overlay</string>
+    <string name="setting_gps_overlay_enabled">Speed overlay</string>
+    <string name="gps_overlay_enabled_label">Show speed on video</string>
+    <string name="setting_gps_speed_unit">Speed unit</string>
+    <string name="setting_gps_show_coordinates">Show coordinates</string>
+    <string name="gps_show_coordinates_label">Show GPS coordinates</string>
+    <string name="setting_gps_track">Save GPS track</string>
+    <string name="gps_track_enabled_label">Save .gpx file per segment</string>
+    <string name="help_gps_overlay">Shows current speed and optionally GPS coordinates as an overlay on recorded video. Saving GPS track writes a .gpx file alongside each recording segment.</string>
+    <string name="gps_speed_kmh">km/h</string>
+    <string name="gps_speed_mph">mph</string>
+
+    <!-- Vehicle model -->
+    <string name="section_vehicle_model">Vehicle model</string>
+    <string name="setting_vehicle_model">Model</string>
+    <string name="help_vehicle_model">Select your BYD vehicle model. This controls camera IDs and resolution. Auto-detect reads Android device information at startup; override here if needed.</string>
+
     <!-- Phone access activity -->
     <string name="phone_access_activity_title">Phone app access</string>
     <string name="phone_access_requirement">The phone and car must be connected to the same Wi-Fi network.\nConnecting the car to your phone\'s shared hotspot also works.</string>

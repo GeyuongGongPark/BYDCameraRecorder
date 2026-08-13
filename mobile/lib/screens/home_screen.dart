@@ -100,6 +100,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _toggleParking() async {
+    if (_state == null) return;
+    try {
+      final next = await _api.setParkingGuard(!_state!.isParking);
+      setState(() => _state = next);
+    } catch (e) {
+      _showError(e.toString());
+    }
+  }
+
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
@@ -244,20 +254,40 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isRec
-                      ? Colors.redAccent.shade700
-                      : const Color(0xFF143D5A),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isRec
+                          ? Colors.redAccent.shade700
+                          : const Color(0xFF143D5A),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: Icon(isRec ? Icons.stop : Icons.fiber_manual_record),
+                    label: Text(isRec ? '녹화 중지' : '녹화 시작'),
+                    onPressed: _toggleRecording,
+                  ),
                 ),
-                icon: Icon(isRec ? Icons.stop : Icons.fiber_manual_record),
-                label: Text(isRec ? '녹화 중지' : '녹화 시작'),
-                onPressed: _toggleRecording,
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isParking
+                          ? Colors.amber.shade800
+                          : const Color(0xFF1A2A1A),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: Icon(isParking
+                        ? Icons.local_parking
+                        : Icons.local_parking_outlined),
+                    label: Text(isParking ? '주차감시 해제' : '주차감시 시작'),
+                    onPressed: _toggleParking,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -294,26 +324,54 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         color: const Color(0xFF0A1020),
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            Center(
-              child: Icon(
-                Icons.videocam,
-                size: 32,
-                color: Colors.white.withValues(alpha: 0.2),
+            Image.network(
+              _api.cameraJpegUri(camera).toString(),
+              fit: BoxFit.cover,
+              headers: _api.sessionCookie != null
+                  ? {'Cookie': 'byd_session=${_api.sessionCookie}'}
+                  : {},
+              errorBuilder: (context, e, stack) => const Center(
+                child: Icon(Icons.videocam_off,
+                    size: 32, color: Colors.white24),
               ),
+              loadingBuilder: (_, child, progress) => progress == null
+                  ? child
+                  : const Center(
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF3DC8FF)),
+                    ),
             ),
             Positioned(
-              bottom: 6,
-              left: 8,
-              child: Text(
-                'Camera $camera',
-                style: const TextStyle(color: Colors.white70, fontSize: 11),
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.7),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: Text(
+                  'Camera $camera',
+                  style: const TextStyle(
+                      color: Colors.white70, fontSize: 11),
+                ),
               ),
             ),
-            Positioned(
+            const Positioned(
               top: 6,
               right: 6,
-              child: Icon(Icons.fullscreen, size: 18, color: Colors.white38),
+              child: Icon(Icons.fullscreen, size: 18, color: Colors.white70),
             ),
           ],
         ),

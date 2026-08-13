@@ -13,8 +13,25 @@ class FilesScreen extends StatefulWidget {
   State<FilesScreen> createState() => _FilesScreenState();
 }
 
-class _FilesScreenState extends State<FilesScreen> {
-  List<Segment> get _segments => widget.state?.segments ?? [];
+class _FilesScreenState extends State<FilesScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  List<Segment> get _allSegments => widget.state?.segments ?? [];
+  List<Segment> get _eventSegments =>
+      _allSegments.where((s) => s.isEvent).toList();
 
   Future<void> _toggleLock(Segment seg) async {
     try {
@@ -29,7 +46,58 @@ class _FilesScreenState extends State<FilesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_segments.isEmpty) {
+    final eventCount = _eventSegments.length;
+
+    return Column(
+      children: [
+        TabBar(
+          controller: _tabController,
+          indicatorColor: const Color(0xFF3DC8FF),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white38,
+          tabs: [
+            const Tab(text: '전체'),
+            Tab(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('이벤트'),
+                  if (eventCount > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.orange,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$eventCount',
+                        style: const TextStyle(
+                            fontSize: 11, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildList(_allSegments),
+              _buildList(_eventSegments),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildList(List<Segment> segments) {
+    if (segments.isEmpty) {
       return const Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -45,17 +113,28 @@ class _FilesScreenState extends State<FilesScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: _segments.length,
-      itemBuilder: (ctx, i) => _segmentTile(_segments[i]),
+      itemCount: segments.length,
+      itemBuilder: (ctx, i) => _segmentTile(segments[i]),
     );
   }
 
+  Color? _eventBorderColor(Segment seg) {
+    if (!seg.isEvent) return null;
+    return seg.eventType == 'impact' ? Colors.orange : const Color(0xFF3DC8FF);
+  }
+
   Widget _segmentTile(Segment seg) {
+    final borderColor = _eventBorderColor(seg);
+
     return Card(
       color: const Color(0xFF0D1926),
       margin: const EdgeInsets.only(bottom: 10),
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: borderColor != null
+            ? BorderSide(color: borderColor, width: 1.5)
+            : BorderSide.none,
+      ),
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -68,9 +147,17 @@ class _FilesScreenState extends State<FilesScreen> {
               fit: StackFit.expand,
               children: [
                 Container(color: const Color(0xFF050D18)),
-                const Center(
-                  child:
-                      Icon(Icons.play_circle_fill, color: Colors.white30),
+                Center(
+                  child: seg.isEvent
+                      ? Icon(
+                          seg.eventType == 'impact'
+                              ? Icons.bolt
+                              : Icons.directions_run,
+                          color: borderColor,
+                          size: 28,
+                        )
+                      : const Icon(Icons.play_circle_fill,
+                          color: Colors.white30),
                 ),
                 if (seg.active)
                   Positioned(
@@ -99,8 +186,10 @@ class _FilesScreenState extends State<FilesScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          '${seg.files.length}개 파일',
-          style: const TextStyle(color: Colors.white38, fontSize: 11),
+          _buildSubtitle(seg),
+          style: TextStyle(
+              color: seg.isEvent ? borderColor!.withValues(alpha: 0.85) : Colors.white38,
+              fontSize: 11),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -139,5 +228,14 @@ class _FilesScreenState extends State<FilesScreen> {
                 ),
       ),
     );
+  }
+
+  String _buildSubtitle(Segment seg) {
+    final filePart = '${seg.files.length}개 파일';
+    if (!seg.isEvent) return filePart;
+    final eventLabel = seg.eventType == 'impact'
+        ? '충격 ${seg.gForce.toStringAsFixed(1)}G'
+        : '모션 감지';
+    return '$eventLabel · $filePart';
   }
 }

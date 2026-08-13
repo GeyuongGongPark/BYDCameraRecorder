@@ -66,6 +66,13 @@ class ApiService {
         jsonDecode(res.body) as Map<String, dynamic>);
   }
 
+  Future<RecorderState> setParkingGuard(bool enabled) async {
+    final res = await _post('api/parking', {'enabled': enabled});
+    _requireOk(res);
+    return RecorderState.fromJson(
+        jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
   // ── 세그먼트 ─────────────────────────────────────────────────────────
 
   Future<RecorderState> setSegmentLocked(String segmentId, bool locked) async {

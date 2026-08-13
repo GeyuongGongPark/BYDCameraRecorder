@@ -198,6 +198,24 @@
     <string name="help_combined_layout">새로 생성된 결합 영상에서 각 모서리에 나타나는 카메라를 설정합니다. 개별 카메라 영상은 순서가 변경되지 않습니다.</string>
     <string name="help_default">이 레코더 설정을 제어합니다.</string>
 
+    <!-- GPS 오버레이 -->
+    <string name="section_gps_overlay">GPS 오버레이</string>
+    <string name="setting_gps_overlay_enabled">속도 오버레이</string>
+    <string name="gps_overlay_enabled_label">영상에 속도 표시</string>
+    <string name="setting_gps_speed_unit">속도 단위</string>
+    <string name="setting_gps_show_coordinates">좌표 표시</string>
+    <string name="gps_show_coordinates_label">GPS 좌표 표시</string>
+    <string name="setting_gps_track">GPS 트랙 저장</string>
+    <string name="gps_track_enabled_label">세그먼트별 .gpx 파일 저장</string>
+    <string name="help_gps_overlay">현재 속도와 GPS 좌표를 녹화 영상 위에 오버레이로 표시합니다. GPS 트랙 저장 시 세그먼트별 .gpx 파일이 녹화 폴더에 함께 저장됩니다.</string>
+    <string name="gps_speed_kmh">km/h</string>
+    <string name="gps_speed_mph">mph</string>
+
+    <!-- 차량 모델 -->
+    <string name="section_vehicle_model">차량 모델</string>
+    <string name="setting_vehicle_model">모델</string>
+    <string name="help_vehicle_model">BYD 차량 모델을 선택합니다. 카메라 ID와 해상도에 영향을 줍니다. 자동 감지는 앱 시작 시 Android 기기 정보를 읽습니다. 필요 시 여기서 수동 지정 가능합니다.</string>
+
     <!-- 폰 접속 화면 -->
     <string name="phone_access_activity_title">폰 앱 접속</string>
     <string name="phone_access_requirement">폰과 차량이 같은 Wi-Fi 네트워크에 연결되어 있어야 합니다.\n차량을 폰의 핫스팟에 연결해도 됩니다.</string>

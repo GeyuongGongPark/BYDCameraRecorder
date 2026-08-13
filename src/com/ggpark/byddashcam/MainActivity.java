@@ -195,6 +195,11 @@ public final class MainActivity extends Activity
     private EditText mqttPasswordInput;
     private EditText mqttTopicPrefixInput;
     private IconCheckbox cloudflareEnabledCheckbox;
+    private IconCheckbox gpsOverlayEnabledCheckbox;
+    private Spinner gpsSpeedUnitSpinner;
+    private IconCheckbox gpsShowCoordinatesCheckbox;
+    private IconCheckbox gpsTrackEnabledCheckbox;
+    private Spinner vehicleModelSpinner;
     private StyledSlider fisheyeCropSlider;
     private TextView fisheyeCropValueView;
     private LinearLayout segmentList;
@@ -1508,6 +1513,82 @@ public final class MainActivity extends Activity
         fields.addView(
                 labeledFieldWithoutHelp(getString(R.string.setting_tunnel_enabled),
                         cloudflareEnabledCheckbox),
+                matchWidthWrap(dp(0), dp(10)));
+
+        // ── GPS 오버레이 ────────────────────────────────────────────────
+        fields.addView(
+                sectionTitleWithHelp(
+                        getString(R.string.section_gps_overlay),
+                        getString(R.string.help_gps_overlay)),
+                matchWidthWrap(dp(0), dp(8)));
+        gpsOverlayEnabledCheckbox = new IconCheckbox(this,
+                getString(R.string.gps_overlay_enabled_label));
+        gpsOverlayEnabledCheckbox.setListener(
+                new IconCheckbox.Listener() {
+                    @Override
+                    public void onCheckedChanged(boolean checked) {
+                        updateSettingsSaveState();
+                    }
+                });
+        fields.addView(
+                labeledFieldWithoutHelp(getString(R.string.setting_gps_overlay_enabled),
+                        gpsOverlayEnabledCheckbox),
+                matchWidthWrap(dp(0), dp(8)));
+        gpsSpeedUnitSpinner = new Spinner(this);
+        gpsSpeedUnitSpinner.setBackgroundResource(R.drawable.input_background);
+        gpsSpeedUnitSpinner.setAdapter(
+                new SpeedUnitAdapter(this,
+                        new String[]{"kmh", "mph"},
+                        new String[]{
+                                getString(R.string.gps_speed_kmh),
+                                getString(R.string.gps_speed_mph)}));
+        gpsSpeedUnitSpinner.setOnItemSelectedListener(settingsSelectionListener(false));
+        fields.addView(
+                labeledFieldWithoutHelp(getString(R.string.setting_gps_speed_unit),
+                        gpsSpeedUnitSpinner),
+                matchWidthWrap(dp(0), dp(8)));
+        gpsShowCoordinatesCheckbox = new IconCheckbox(this,
+                getString(R.string.gps_show_coordinates_label));
+        gpsShowCoordinatesCheckbox.setListener(
+                new IconCheckbox.Listener() {
+                    @Override
+                    public void onCheckedChanged(boolean checked) {
+                        updateSettingsSaveState();
+                    }
+                });
+        fields.addView(
+                labeledFieldWithoutHelp(getString(R.string.setting_gps_show_coordinates),
+                        gpsShowCoordinatesCheckbox),
+                matchWidthWrap(dp(0), dp(8)));
+        gpsTrackEnabledCheckbox = new IconCheckbox(this,
+                getString(R.string.gps_track_enabled_label));
+        gpsTrackEnabledCheckbox.setListener(
+                new IconCheckbox.Listener() {
+                    @Override
+                    public void onCheckedChanged(boolean checked) {
+                        updateSettingsSaveState();
+                    }
+                });
+        fields.addView(
+                labeledFieldWithoutHelp(getString(R.string.setting_gps_track),
+                        gpsTrackEnabledCheckbox),
+                matchWidthWrap(dp(0), dp(10)));
+
+        // ── 차량 모델 ────────────────────────────────────────────────────
+        fields.addView(
+                sectionTitleWithHelp(
+                        getString(R.string.section_vehicle_model),
+                        getString(R.string.help_vehicle_model)),
+                matchWidthWrap(dp(0), dp(8)));
+        vehicleModelSpinner = new Spinner(this);
+        vehicleModelSpinner.setBackgroundResource(R.drawable.input_background);
+        vehicleModelSpinner.setAdapter(
+                new VehicleProfileAdapter(this,
+                        VehicleProfileRegistry.ALL_PROFILES));
+        vehicleModelSpinner.setOnItemSelectedListener(settingsSelectionListener(false));
+        fields.addView(
+                labeledField(getString(R.string.setting_vehicle_model),
+                        vehicleModelSpinner, R.string.help_vehicle_model),
                 matchWidthWrap(dp(0), dp(10)));
 
         scroll.addView(fields);
@@ -3550,6 +3631,23 @@ public final class MainActivity extends Activity
         if (cloudflareEnabledCheckbox != null) {
             cloudflareEnabledCheckbox.setChecked(settings.cloudflareEnabled);
         }
+        if (gpsOverlayEnabledCheckbox != null) {
+            gpsOverlayEnabledCheckbox.setChecked(settings.gpsOverlayEnabled);
+        }
+        if (gpsSpeedUnitSpinner != null) {
+            SpeedUnitAdapter adapter = (SpeedUnitAdapter) gpsSpeedUnitSpinner.getAdapter();
+            gpsSpeedUnitSpinner.setSelection(adapter.indexOf(settings.gpsSpeedUnit));
+        }
+        if (gpsShowCoordinatesCheckbox != null) {
+            gpsShowCoordinatesCheckbox.setChecked(settings.gpsShowCoordinates);
+        }
+        if (gpsTrackEnabledCheckbox != null) {
+            gpsTrackEnabledCheckbox.setChecked(settings.gpsTrackEnabled);
+        }
+        if (vehicleModelSpinner != null) {
+            VehicleProfileAdapter adapter = (VehicleProfileAdapter) vehicleModelSpinner.getAdapter();
+            vehicleModelSpinner.setSelection(adapter.indexOf(settings.vehicleModelId));
+        }
         for (int index = 0; index < cameraNameInputs.length; index++) {
             if (cameraNameInputs[index] != null) {
                 cameraNameInputs[index].setText(settings.cameraName(index));
@@ -3722,7 +3820,12 @@ public final class MainActivity extends Activity
                 && left.mqttTopicPrefix.equals(right.mqttTopicPrefix)
                 && left.cloudflareEnabled == right.cloudflareEnabled
                 && left.cameraMotionEnabled == right.cameraMotionEnabled
-                && left.cameraMotionSensitivity == right.cameraMotionSensitivity;
+                && left.cameraMotionSensitivity == right.cameraMotionSensitivity
+                && left.gpsOverlayEnabled == right.gpsOverlayEnabled
+                && left.gpsSpeedUnit.equals(right.gpsSpeedUnit)
+                && left.gpsShowCoordinates == right.gpsShowCoordinates
+                && left.gpsTrackEnabled == right.gpsTrackEnabled
+                && left.vehicleModelId.equals(right.vehicleModelId);
     }
 
     private void refreshStorage() {
@@ -4523,11 +4626,22 @@ public final class MainActivity extends Activity
                     cameraFlipHorizontal,
                     cameraFlipVertical,
                     fisheyeCropPercent,
-                    settings.vehicleModelId,
-                    settings.gpsOverlayEnabled,
-                    settings.gpsSpeedUnit,
-                    settings.gpsShowCoordinates,
-                    settings.gpsTrackEnabled,
+                    vehicleModelSpinner != null
+                            ? ((VehicleProfile) vehicleModelSpinner.getSelectedItem()).modelId()
+                            : settings.vehicleModelId,
+                    gpsOverlayEnabledCheckbox != null
+                            ? gpsOverlayEnabledCheckbox.isChecked()
+                            : settings.gpsOverlayEnabled,
+                    gpsSpeedUnitSpinner != null
+                            ? ((SpeedUnitAdapter) gpsSpeedUnitSpinner.getAdapter())
+                                    .idAt(gpsSpeedUnitSpinner.getSelectedItemPosition())
+                            : settings.gpsSpeedUnit,
+                    gpsShowCoordinatesCheckbox != null
+                            ? gpsShowCoordinatesCheckbox.isChecked()
+                            : settings.gpsShowCoordinates,
+                    gpsTrackEnabledCheckbox != null
+                            ? gpsTrackEnabledCheckbox.isChecked()
+                            : settings.gpsTrackEnabled,
                     parkingImpactThresholdG,
                     parkingRecordingSeconds,
                     parkingAutoLockCheckbox != null
@@ -4771,6 +4885,112 @@ public final class MainActivity extends Activity
             int padding = Math.round(
                     10 * context.getResources().getDisplayMetrics().density);
             view.setPadding(padding, padding, padding * 2, padding);
+            return view;
+        }
+    }
+
+    private static final class VehicleProfileAdapter extends BaseAdapter {
+        private final Context context;
+        private final java.util.List<VehicleProfile> profiles;
+
+        VehicleProfileAdapter(Context context, java.util.List<VehicleProfile> profiles) {
+            this.context = context;
+            this.profiles = profiles;
+        }
+
+        @Override
+        public int getCount() { return profiles.size(); }
+
+        @Override
+        public VehicleProfile getItem(int position) { return profiles.get(position); }
+
+        @Override
+        public long getItemId(int position) { return position; }
+
+        public int indexOf(String modelId) {
+            for (int i = 0; i < profiles.size(); i++) {
+                if (profiles.get(i).modelId().equals(modelId)) return i;
+            }
+            return 0;
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            return createRow(position, convertView, true);
+        }
+
+        @Override
+        public View getDropDownView(int position, View convertView, ViewGroup parent) {
+            return createRow(position, convertView, false);
+        }
+
+        private TextView createRow(int position, View convertView, boolean singleLine) {
+            TextView view = convertView instanceof TextView
+                    ? (TextView) convertView : new TextView(context);
+            view.setText(profiles.get(position).displayName());
+            view.setTextColor(Color.WHITE);
+            view.setTextSize(13);
+            view.setBackgroundColor(Color.rgb(18, 29, 47));
+            view.setSingleLine(singleLine);
+            view.setEllipsize(TextUtils.TruncateAt.END);
+            int p = Math.round(10 * context.getResources().getDisplayMetrics().density);
+            view.setPadding(p, p, singleLine ? p * 4 : p * 2, p);
+            return view;
+        }
+    }
+
+    private static final class SpeedUnitAdapter extends BaseAdapter {
+        private final Context context;
+        private final String[] ids;
+        private final String[] labels;
+
+        SpeedUnitAdapter(Context context, String[] ids, String[] labels) {
+            this.context = context;
+            this.ids = ids;
+            this.labels = labels;
+        }
+
+        @Override
+        public int getCount() { return labels.length; }
+
+        @Override
+        public String getItem(int position) { return labels[position]; }
+
+        @Override
+        public long getItemId(int position) { return position; }
+
+        public int indexOf(String id) {
+            for (int i = 0; i < ids.length; i++) {
+                if (ids[i].equals(id)) return i;
+            }
+            return 0;
+        }
+
+        public String idAt(int position) {
+            return ids[position];
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            return createRow(position, convertView, true);
+        }
+
+        @Override
+        public View getDropDownView(int position, View convertView, ViewGroup parent) {
+            return createRow(position, convertView, false);
+        }
+
+        private TextView createRow(int position, View convertView, boolean singleLine) {
+            TextView view = convertView instanceof TextView
+                    ? (TextView) convertView : new TextView(context);
+            view.setText(labels[position]);
+            view.setTextColor(Color.WHITE);
+            view.setTextSize(13);
+            view.setBackgroundColor(Color.rgb(18, 29, 47));
+            view.setSingleLine(singleLine);
+            view.setEllipsize(TextUtils.TruncateAt.END);
+            int p = Math.round(10 * context.getResources().getDisplayMetrics().density);
+            view.setPadding(p, p, singleLine ? p * 4 : p * 2, p);
             return view;
         }
     }
