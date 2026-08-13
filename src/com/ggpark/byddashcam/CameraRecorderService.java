@@ -78,6 +78,8 @@ public final class CameraRecorderService extends Service
     private static final long RECORD_INTERVAL_NANOS = 0L;
     private static final long PERFORMANCE_LOG_INTERVAL_NANOS =
             5_000_000_000L;
+    // 주차 대기 중 프리버퍼 세그먼트 길이 (초)
+    private static final int PRE_BUFFER_SECONDS = 12;
     private static final long INITIAL_RECOVERY_DELAY_MILLIS = 15_000L;
     private static final long RECOVERY_INTERVAL_MILLIS = 60_000L;
     private static final long FIRST_RECORDING_FRAME_TIMEOUT_MILLIS = 20_000L;
@@ -666,7 +668,8 @@ public final class CameraRecorderService extends Service
                 currentUiListener != null
                         && frameSource instanceof AvmCameraController;
         boolean recordingFrameDue =
-                (currentMode == Mode.RECORDING || currentMode == Mode.PARKING_RECORDING)
+                (currentMode == Mode.RECORDING || currentMode == Mode.PARKING_RECORDING
+                        || currentMode == Mode.PARKING_STANDBY)
                         && (lastRecordedFrameNanos == 0L
                                 || rawFrame.monotonicNanos
                                         - lastRecordedFrameNanos
@@ -985,6 +988,16 @@ public final class CameraRecorderService extends Service
             cameraSourceActive = true;
         }
         mode = Mode.PARKING_STANDBY;
+        // 프리버퍼 녹화 시작: 충격 발생 시 직전 영상도 보존하기 위해
+        RecorderSettings parkingRecordingSettings =
+                settings.withContinuousRecordingEnabled(false);
+        lastRecordedFrameNanos = 0L;
+        pendingRecordingSettings = parkingRecordingSettings;
+        try {
+            segmentRecorder.startPreBuffer(parkingRecordingSettings, PRE_BUFFER_SECONDS);
+        } catch (IOException e) {
+            Log.e(TAG, "Pre-buffer start failed; standby continues without pre-buffer", e);
+        }
         ParkingGuardSettings parkingSettings = new ParkingGuardSettings(
                 settings.parkingImpactThresholdG,
                 settings.parkingRecordingSeconds,
@@ -1017,9 +1030,12 @@ public final class CameraRecorderService extends Service
             parkingGuardController.stop();
             parkingGuardController = null;
         }
+        // 프리버퍼 디렉토리 보호 해제 (충격 없이 종료 시 cleanup이 삭제할 수 있도록)
+        segmentRecorder.getAndClearPreBufferDirs();
         if (segmentRecorder.isStarted()) {
             segmentRecorder.stop();
         }
+        pendingRecordingSettings = null;
         mode = Mode.NOT_RECORDING;
         releaseWakeLock();
         stopForeground(true);
@@ -1034,20 +1050,34 @@ public final class CameraRecorderService extends Service
         Log.i(TAG, "Parking impact: " + gForce + "G - starting recording");
         mode = Mode.PARKING_RECORDING;
         RecorderSettings settings = RecorderSettings.load(this);
-        RecorderSettings parkingRecordingSettings =
-                settings.withContinuousRecordingEnabled(false);
+        // 다음 세그먼트(이벤트 세그먼트)에 충격 메타데이터 기록
+        segmentRecorder.setEventMetadata("impact", gForce);
         if (segmentRecorder.isStarted()) {
+            // 프리버퍼 디렉토리 잠금 후 이벤트 세그먼트로 rotate
+            List<File> preBufferDirs = segmentRecorder.getAndClearPreBufferDirs();
+            if (settings.parkingAutoLock) {
+                for (File dir : preBufferDirs) {
+                    try {
+                        storageRepository.setLocked(settings, dir, true);
+                        Log.i(TAG, "Pre-buffer dir locked: " + dir.getName());
+                    } catch (IOException e) {
+                        Log.w(TAG, "Failed to lock pre-buffer dir: " + dir.getName(), e);
+                    }
+                }
+                segmentRecorder.setAutoLockForNextSegment();
+            }
             try {
-                segmentRecorder.rotateNow(settings.parkingAutoLock);
+                segmentRecorder.rotateNow(false);
             } catch (IOException exception) {
                 Log.e(TAG, "Parking segment rotate failed", exception);
             }
         } else {
+            RecorderSettings parkingRecordingSettings =
+                    settings.withContinuousRecordingEnabled(false);
             lastRecordedFrameNanos = 0L;
             pendingRecordingSettings = parkingRecordingSettings;
             scheduleRecordingStartupTimeout();
             if (settings.parkingAutoLock) {
-                // 새 세그먼트가 열릴 때 자동 잠금되도록 설정
                 segmentRecorder.setAutoLockForNextSegment();
             }
         }
@@ -1072,11 +1102,21 @@ public final class CameraRecorderService extends Service
             return;
         }
         Log.i(TAG, "Parking recording timeout - returning to standby");
+        cancelRecordingStartupTimeout();
         if (segmentRecorder.isStarted()) {
             segmentRecorder.stop();
         }
-        pendingRecordingSettings = null;
-        cancelRecordingStartupTimeout();
+        // 프리버퍼 모드로 재시작하여 다음 충격 이벤트를 대비
+        RecorderSettings settings = RecorderSettings.load(this);
+        RecorderSettings parkingSettings = settings.withContinuousRecordingEnabled(false);
+        lastRecordedFrameNanos = 0L;
+        pendingRecordingSettings = parkingSettings;
+        try {
+            segmentRecorder.startPreBuffer(parkingSettings, PRE_BUFFER_SECONDS);
+        } catch (IOException e) {
+            Log.e(TAG, "Pre-buffer restart failed after event", e);
+            pendingRecordingSettings = null;
+        }
         mode = Mode.PARKING_STANDBY;
         enterForeground();
         publishState("주차 감시 녹화 완료 - 대기 중");

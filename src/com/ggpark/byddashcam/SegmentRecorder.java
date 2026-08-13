@@ -5,6 +5,7 @@ import android.util.Log;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashSet;
@@ -51,6 +52,16 @@ public final class SegmentRecorder {
     private final GpxTrackWriter gpxTrackWriter = new GpxTrackWriter();
     private volatile GpsFix latestGpsFix = GpsFix.UNAVAILABLE;
 
+    // Pre-buffer support: keep recent short segments during parking standby
+    // so that the footage before an impact event is retained.
+    private static final long PRE_BUFFER_SEGMENT_NANOS_DEFAULT = 12_000_000_000L;
+    private static final int PRE_BUFFER_KEEP_COUNT = 1;
+    private boolean preBufferMode = false;
+    private long preBufferSegmentNanos = PRE_BUFFER_SEGMENT_NANOS_DEFAULT;
+    private final ArrayDeque<File> preBufferDirs = new ArrayDeque<>();
+    private String pendingEventType = null;
+    private float pendingGForce = 0f;
+
     public SegmentRecorder(StorageRepository storageRepository, Listener listener) {
         this.storageRepository = storageRepository;
         this.listener = listener;
@@ -61,8 +72,9 @@ public final class SegmentRecorder {
     }
 
     /**
-     * Directories automated cleanup must never delete: the active segment and
-     * segments queued for or undergoing background stitching.
+     * Directories automated cleanup must never delete: the active segment,
+     * segments queued for or undergoing background stitching, and pre-buffer
+     * segments kept in case an impact event needs to reference them.
      */
     public Set<File> getProtectedDirectories() {
         Set<File> result = new LinkedHashSet<>();
@@ -73,7 +85,43 @@ public final class SegmentRecorder {
         synchronized (pendingStitchDirectories) {
             result.addAll(pendingStitchDirectories);
         }
+        result.addAll(preBufferDirs);
         return result;
+    }
+
+    /**
+     * 주차 대기 모드에서 짧은 세그먼트로 프리버퍼 녹화를 시작합니다.
+     * 충격 감지 시 직전 세그먼트를 이벤트 영상으로 보존할 수 있습니다.
+     */
+    public void startPreBuffer(RecorderSettings requestedSettings, int segmentSeconds) throws IOException {
+        if (started) {
+            return;
+        }
+        preBufferMode = true;
+        preBufferSegmentNanos = (long) segmentSeconds * 1_000_000_000L;
+        preBufferDirs.clear();
+        pendingEventType = null;
+        pendingGForce = 0f;
+        start(requestedSettings);
+    }
+
+    /**
+     * 프리버퍼 모드를 해제하고 보존된 디렉토리 목록을 반환합니다.
+     * 반환된 디렉토리는 이벤트 세그먼트와 함께 잠금 처리해야 합니다.
+     */
+    public List<File> getAndClearPreBufferDirs() {
+        List<File> result = new ArrayList<>(preBufferDirs);
+        preBufferDirs.clear();
+        preBufferMode = false;
+        return result;
+    }
+
+    /**
+     * 충격 이벤트 발생 시 다음에 열리는 세그먼트에 기록할 메타데이터를 설정합니다.
+     */
+    public void setEventMetadata(String eventType, float gForce) {
+        pendingEventType = eventType;
+        pendingGForce = gForce;
     }
 
     public boolean isProtectedDirectory(File directory) {
@@ -149,7 +197,9 @@ public final class SegmentRecorder {
         if (!started) {
             return;
         }
-        long segmentDurationNanos = settings.segmentMinutes * 60L * 1_000_000_000L;
+        long segmentDurationNanos = preBufferMode
+                ? preBufferSegmentNanos
+                : settings.segmentMinutes * 60L * 1_000_000_000L;
         if (frame.monotonicNanos - segmentStartedNanos >= segmentDurationNanos) {
             rotate();
         } else if (frame.monotonicNanos - chunkStartedNanos
@@ -208,6 +258,14 @@ public final class SegmentRecorder {
             return;
         }
         closedDirectory.setLastModified(System.currentTimeMillis());
+        // 프리버퍼 모드: 완료된 세그먼트를 큐에 추가하고 오래된 것은 삭제
+        if (preBufferMode && completed) {
+            preBufferDirs.addLast(closedDirectory);
+            while (preBufferDirs.size() > PRE_BUFFER_KEEP_COUNT) {
+                File old = preBufferDirs.removeFirst();
+                deleteDirectoryQuietly(old);
+            }
+        }
         if (allFinalized) {
             // Every final video was written directly during recording, so a
             // clean close is instant: drop the marker now and discard the
@@ -227,6 +285,23 @@ public final class SegmentRecorder {
             // succeeds so a kill remains recoverable.
             enqueueStitch(closedDirectory);
         }
+    }
+
+    private static void deleteDirectoryQuietly(File dir) {
+        if (dir == null) {
+            return;
+        }
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                if (f.isDirectory()) {
+                    deleteDirectoryQuietly(f);
+                } else {
+                    f.delete();
+                }
+            }
+        }
+        dir.delete();
     }
 
     private void discardPartsAsync(final File segmentDirectory) {
@@ -311,6 +386,8 @@ public final class SegmentRecorder {
                         activeDirectory,
                         cameraNames);
         writeMetadata(activeDirectory, recordingFiles);
+        pendingEventType = null;
+        pendingGForce = 0f;
 
         File partsDirectory =
                 SegmentStitcher.partsDirectory(activeDirectory);
@@ -469,7 +546,16 @@ public final class SegmentRecorder {
                     + (settings.combinedCameraIndex(2) + 1)
                     + ", "
                     + (settings.combinedCameraIndex(3) + 1)
-                    + "]\n");
+                    + "],\n");
+            writer.write("  \"isPreBuffer\": " + preBufferMode + ",\n");
+            if (pendingEventType != null) {
+                writer.write("  \"eventType\": "
+                        + PhoneJson.quote(pendingEventType)
+                        + ",\n");
+                writer.write("  \"gForce\": " + pendingGForce + "\n");
+            } else {
+                writer.write("  \"eventType\": null\n");
+            }
             writer.write("}\n");
         }
     }
