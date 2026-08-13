@@ -40,7 +40,7 @@ jobs:
           BYD_CAMERA_SIGNING_MODE: debug
 
       - name: Rename car APK
-        run: cp build/byd-dashcam-debug.apk build/BYD블랙박스-차량용-${{ github.ref_name }}.apk
+        run: cp build/byd-dashcam-debug.apk build/BYD-BlackBox-Car-${{ github.ref_name }}.apk
 
       # ── Release signing (optional) ──────────────────────────────────────
       # To enable release signing:
@@ -64,7 +64,7 @@ jobs:
       #     BYD_CAMERA_SIGNING_MODE: release
       #     BYD_CAMERA_RELEASE_SIGNING_DIR: ${{ github.workspace }}_build_secret
       # - name: Rename car APK
-      #   run: cp build/byd-dashcam.apk build/BYD블랙박스-차량용-${{ github.ref_name }}.apk
+      #   run: cp build/byd-dashcam.apk build/BYD-BlackBox-Car-${{ github.ref_name }}.apk
 
       # ── 폰앱 Flutter Android APK ───────────────────────────────────────
       - name: Set up Flutter
@@ -81,7 +81,7 @@ jobs:
         working-directory: mobile
 
       - name: Rename phone APK
-        run: cp mobile/build/app/outputs/flutter-apk/app-debug.apk build/BYD블랙박스-폰앱-${{ github.ref_name }}.apk
+        run: cp mobile/build/app/outputs/flutter-apk/app-debug.apk build/BYD-BlackBox-Phone-${{ github.ref_name }}.apk
 
       # ── GitHub Release ─────────────────────────────────────────────────
       - name: Create GitHub Release
@@ -89,7 +89,7 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --generate-notes \
             --title "${{ github.ref_name }}" \
-            "build/BYD블랙박스-차량용-${{ github.ref_name }}.apk" \
-            "build/BYD블랙박스-폰앱-${{ github.ref_name }}.apk"
+            "build/BYD-BlackBox-Car-${{ github.ref_name }}.apk" \
+            "build/BYD-BlackBox-Phone-${{ github.ref_name }}.apk"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
