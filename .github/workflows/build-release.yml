@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,7 +16,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js (phone-ui)
+      # ── phone-ui (차량 앱 내장 웹 UI) ──────────────────────────────────
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -23,47 +27,68 @@ jobs:
       - name: Build phone-ui
         run: npm --prefix phone-ui ci && npm --prefix phone-ui run build
 
+      # ── 차량용 Android APK ─────────────────────────────────────────────
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build APK (debug)
+      - name: Build car APK
         run: ./build.sh
         env:
           BYD_CAMERA_SIGNING_MODE: debug
 
+      - name: Rename car APK
+        run: cp build/byd-dashcam-debug.apk build/BYD블랙박스-차량용-${{ github.ref_name }}.apk
+
       # ── Release signing (optional) ──────────────────────────────────────
       # To enable release signing:
-      # 1. Generate a keystore: keytool -genkeypair -keystore byd-camera-release.jks ...
+      # 1. Generate: keytool -genkeypair -keystore byd-camera-release.jks \
+      #              -alias byd-camera-release -keyalg RSA -validity 10000
       # 2. Add GitHub Secrets:
-      #      RELEASE_KEYSTORE_BASE64  (base64-encoded .jks)
+      #      RELEASE_KEYSTORE_BASE64  (base64 -i byd-camera-release.jks)
       #      RELEASE_KEYSTORE_PASSWORD
-      # 3. Uncomment the steps below and comment out the debug build above.
+      # 3. Uncomment steps below, comment out the debug build above.
       #
       # - name: Prepare release keystore
-      #   if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
       #   run: |
       #     mkdir -p ${GITHUB_WORKSPACE}_build_secret
       #     echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d \
       #       > ${GITHUB_WORKSPACE}_build_secret/byd-camera-release.jks
       #     echo "${{ secrets.RELEASE_KEYSTORE_PASSWORD }}" \
       #       > ${GITHUB_WORKSPACE}_build_secret/byd-camera-release.password
-      #
-      # - name: Build APK (release)
+      # - name: Build car APK (release-signed)
       #   run: ./build.sh
       #   env:
       #     BYD_CAMERA_SIGNING_MODE: release
       #     BYD_CAMERA_RELEASE_SIGNING_DIR: ${{ github.workspace }}_build_secret
+      # - name: Rename car APK
+      #   run: cp build/byd-dashcam.apk build/BYD블랙박스-차량용-${{ github.ref_name }}.apk
 
-      - name: Extract version from tag
-        id: version
-        run: echo "name=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+      # ── 폰앱 Flutter Android APK ───────────────────────────────────────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
 
+      - name: Flutter dependencies
+        run: flutter pub get
+        working-directory: mobile
+
+      - name: Build phone app APK
+        run: flutter build apk --debug
+        working-directory: mobile
+
+      - name: Rename phone APK
+        run: cp mobile/build/app/outputs/flutter-apk/app-debug.apk build/BYD블랙박스-폰앱-${{ github.ref_name }}.apk
+
+      # ── GitHub Release ─────────────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ steps.version.outputs.name }}
+          name: ${{ github.ref_name }}
           generate_release_notes: true
-          files: build/byd-dashcam-debug.apk
+          files: |
+            build/BYD블랙박스-차량용-${{ github.ref_name }}.apk
+            build/BYD블랙박스-폰앱-${{ github.ref_name }}.apk
