@@ -37,25 +37,36 @@ public class GpsDataProvider implements LocationListener {
             return;
         }
         try {
-            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                locationManager.requestLocationUpdates(
-                        LocationManager.GPS_PROVIDER,
-                        UPDATE_INTERVAL_MS,
-                        UPDATE_MIN_DISTANCE_M,
-                        this);
-                // 마지막 알려진 위치로 초기화
-                Location lastKnown =
-                        locationManager.getLastKnownLocation(
-                                LocationManager.GPS_PROVIDER);
-                if (lastKnown != null) {
-                    updateFromLocation(lastKnown);
+            boolean anyStarted = false;
+            for (String provider : new String[]{
+                    LocationManager.GPS_PROVIDER,
+                    LocationManager.NETWORK_PROVIDER}) {
+                try {
+                    if (locationManager.isProviderEnabled(provider)) {
+                        locationManager.requestLocationUpdates(
+                                provider,
+                                UPDATE_INTERVAL_MS,
+                                UPDATE_MIN_DISTANCE_M,
+                                this);
+                        Location lastKnown =
+                                locationManager.getLastKnownLocation(provider);
+                        if (lastKnown != null) {
+                            updateFromLocation(lastKnown);
+                        }
+                        Log.i(TAG, "GPS: started provider=" + provider);
+                        anyStarted = true;
+                    } else {
+                        Log.w(TAG, "GPS: provider disabled=" + provider);
+                    }
+                } catch (SecurityException e) {
+                    Log.w(TAG, "GPS: no permission for provider=" + provider);
                 }
-                Log.i(TAG, "GPS provider started");
-            } else {
-                Log.w(TAG, "GPS provider is disabled on this device");
             }
-        } catch (SecurityException exception) {
-            Log.w(TAG, "GPS: location permission not granted", exception);
+            if (!anyStarted) {
+                Log.w(TAG, "GPS: no providers available");
+            }
+        } catch (Exception exception) {
+            Log.w(TAG, "GPS: start failed", exception);
         }
     }
 
@@ -97,7 +108,9 @@ public class GpsDataProvider implements LocationListener {
 
     private void updateFromLocation(Location location) {
         long now = System.currentTimeMillis();
-        boolean fresh = (now - location.getTime()) < MAX_FIX_AGE_MS;
+        // 일부 기기에서 location.getTime()이 0을 반환할 수 있음 → 현재 시각으로 대체
+        long fixTime = location.getTime() > 0 ? location.getTime() : now;
+        boolean fresh = (now - fixTime) < MAX_FIX_AGE_MS;
         double speedKmh =
                 location.hasSpeed()
                         ? location.getSpeed() * MS_TO_KMH
@@ -107,7 +120,7 @@ public class GpsDataProvider implements LocationListener {
                 location.getLatitude(),
                 location.getLongitude(),
                 location.hasAltitude() ? location.getAltitude() : 0.0,
-                location.getTime(),
+                fixTime,
                 fresh);
         Listener l = listener;
         if (l != null) {
