@@ -182,6 +182,7 @@ public final class CameraRecorderService extends Service
     private volatile long uiStateVersion = 1L;
     private GpsDataProvider gpsDataProvider;
     private GpsOverlayRenderer gpsOverlayRenderer;
+    private VehicleDataProvider vehicleDataProvider;
     private ParkingGuardController parkingGuardController;
     private TelegramNotifier telegramNotifier;
     private MqttPublisher mqttPublisher;
@@ -211,6 +212,7 @@ public final class CameraRecorderService extends Service
         RecorderSettings initialSettings = RecorderSettings.load(this);
         applyPhoneAccessSetting(initialSettings);
         startGps(initialSettings);
+        startVehicleTelemetry(initialSettings);
         systemMonitor = new SystemMonitor();
         initTelegramNotifier(initialSettings);
         initMqttPublisher(initialSettings);
@@ -314,6 +316,7 @@ public final class CameraRecorderService extends Service
     public void onDestroy() {
         segmentRecoveryLoopRunning = false;
         stopGps();
+        stopVehicleTelemetry();
         shutdown();
         closePhonePreviewWorker();
         if (telegramNotifier != null) {
@@ -966,6 +969,35 @@ public final class CameraRecorderService extends Service
         segmentRecorder.updateGpsFix(fix);
     }
 
+    private void startVehicleTelemetry(RecorderSettings settings) {
+        if (!settings.telemetryEnabled) {
+            return;
+        }
+        vehicleDataProvider = new VehicleDataProvider();
+        vehicleDataProvider.setListener(new VehicleDataProvider.Listener() {
+            @Override
+            public void onTelemetryUpdated(VehicleTelemetry telemetry) {
+                onVehicleTelemetryUpdated(telemetry);
+            }
+        });
+        vehicleDataProvider.start(this);
+    }
+
+    private void stopVehicleTelemetry() {
+        if (vehicleDataProvider != null) {
+            vehicleDataProvider.stop();
+            vehicleDataProvider = null;
+        }
+    }
+
+    private void onVehicleTelemetryUpdated(VehicleTelemetry telemetry) {
+        GpsOverlayRenderer renderer = gpsOverlayRenderer;
+        if (renderer != null) {
+            renderer.updateTelemetry(telemetry);
+        }
+        segmentRecorder.updateTelemetry(telemetry);
+    }
+
     /** 주차 감시 모드로 진입합니다. */
     public synchronized void enterParkingMode() {
         if (mode == Mode.PARKING_STANDBY || mode == Mode.PARKING_RECORDING) {
@@ -1353,7 +1385,8 @@ public final class CameraRecorderService extends Service
                 PhoneJson.stringValue(json, "mqttTopicPrefix", current.mqttTopicPrefix),
                 PhoneJson.booleanValue(json, "cloudflareEnabled", current.cloudflareEnabled),
                 current.cameraMotionEnabled,
-                current.cameraMotionSensitivity);
+                current.cameraMotionSensitivity,
+                current.telemetryEnabled);
         updated.save(this);
         applyRecorderSettings(updated);
         publishSettingsChanged();

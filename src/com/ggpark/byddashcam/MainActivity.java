@@ -4682,7 +4682,8 @@ public final class MainActivity extends Activity
                             : settings.cameraMotionEnabled,
                     cameraMotionSensitivityStepper != null
                             ? cameraMotionSensitivityStepper.getValue()
-                            : settings.cameraMotionSensitivity);
+                            : settings.cameraMotionSensitivity,
+                    settings.telemetryEnabled);
         } catch (NumberFormatException exception) {
             if (showErrors) {
                 showMessage(getString(R.string.msg_invalid_settings));

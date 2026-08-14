@@ -52,6 +52,7 @@ public final class RecorderSettings {
     private static final String KEY_CLOUDFLARE_ENABLED = "cloudflare_enabled";
     private static final String KEY_CAMERA_MOTION_ENABLED = "camera_motion_enabled";
     private static final String KEY_CAMERA_MOTION_SENSITIVITY = "camera_motion_sensitivity";
+    private static final String KEY_TELEMETRY_ENABLED = "telemetry_enabled";
 
     public static final int DEFAULT_FISHEYE_CROP_PERCENT = 15;
     public static final int DEFAULT_MIN_FREE_PERCENT = 5;
@@ -108,6 +109,7 @@ public final class RecorderSettings {
     public final boolean cloudflareEnabled;
     public final boolean cameraMotionEnabled;
     public final int cameraMotionSensitivity;
+    public final boolean telemetryEnabled;
 
     public RecorderSettings(
             int volumeIndex,
@@ -146,7 +148,8 @@ public final class RecorderSettings {
             String mqttTopicPrefix,
             boolean cloudflareEnabled,
             boolean cameraMotionEnabled,
-            int cameraMotionSensitivity) {
+            int cameraMotionSensitivity,
+            boolean telemetryEnabled) {
         this.volumeIndex = Math.max(0, volumeIndex);
         this.quotaBytes = clampLong(
                 quotaBytes,
@@ -212,6 +215,7 @@ public final class RecorderSettings {
         this.cloudflareEnabled = cloudflareEnabled;
         this.cameraMotionEnabled = cameraMotionEnabled;
         this.cameraMotionSensitivity = clamp(cameraMotionSensitivity, 1, 5);
+        this.telemetryEnabled = telemetryEnabled;
     }
 
     public static RecorderSettings load(Context context) {
@@ -272,7 +276,8 @@ public final class RecorderSettings {
                 preferences.getString(KEY_MQTT_TOPIC_PREFIX, "byd"),
                 preferences.getBoolean(KEY_CLOUDFLARE_ENABLED, false),
                 preferences.getBoolean(KEY_CAMERA_MOTION_ENABLED, false),
-                preferences.getInt(KEY_CAMERA_MOTION_SENSITIVITY, 3));
+                preferences.getInt(KEY_CAMERA_MOTION_SENSITIVITY, 3),
+                preferences.getBoolean(KEY_TELEMETRY_ENABLED, true));
     }
 
     public void save(Context context) {
@@ -315,7 +320,8 @@ public final class RecorderSettings {
                 .putString(KEY_MQTT_TOPIC_PREFIX, mqttTopicPrefix)
                 .putBoolean(KEY_CLOUDFLARE_ENABLED, cloudflareEnabled)
                 .putBoolean(KEY_CAMERA_MOTION_ENABLED, cameraMotionEnabled)
-                .putInt(KEY_CAMERA_MOTION_SENSITIVITY, cameraMotionSensitivity);
+                .putInt(KEY_CAMERA_MOTION_SENSITIVITY, cameraMotionSensitivity)
+                .putBoolean(KEY_TELEMETRY_ENABLED, telemetryEnabled);
         for (int index = 0; index < cameraNames.length; index++) {
             editor.putString(KEY_CAMERA_NAME_PREFIX + index, cameraNames[index]);
             editor.putInt(
@@ -415,7 +421,8 @@ public final class RecorderSettings {
                 mqttTopicPrefix,
                 cloudflareEnabled,
                 cameraMotionEnabled,
-                cameraMotionSensitivity);
+                cameraMotionSensitivity,
+                telemetryEnabled);
     }
 
     public RecorderSettings withPhoneAccess(
@@ -459,7 +466,8 @@ public final class RecorderSettings {
                 mqttTopicPrefix,
                 cloudflareEnabled,
                 cameraMotionEnabled,
-                cameraMotionSensitivity);
+                cameraMotionSensitivity,
+                telemetryEnabled);
     }
 
     public RecorderSettings withPhoneAccessPin(String accessPin) {
@@ -500,7 +508,8 @@ public final class RecorderSettings {
                 mqttTopicPrefix,
                 cloudflareEnabled,
                 cameraMotionEnabled,
-                cameraMotionSensitivity);
+                cameraMotionSensitivity,
+                telemetryEnabled);
     }
 
     public RecorderSettings withVehicleModelId(String newModelId) {
@@ -541,7 +550,8 @@ public final class RecorderSettings {
                 mqttTopicPrefix,
                 cloudflareEnabled,
                 cameraMotionEnabled,
-                cameraMotionSensitivity);
+                cameraMotionSensitivity,
+                telemetryEnabled);
     }
 
     private static String defaultCameraName(int cameraIndex) {

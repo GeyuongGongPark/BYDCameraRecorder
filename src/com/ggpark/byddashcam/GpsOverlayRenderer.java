@@ -9,37 +9,49 @@ import android.graphics.Typeface;
 import java.util.Locale;
 
 /**
- * GPS 정보를 NV21 프레임에 직접 합성하는 렌더러.
+ * GPS 정보 및 차량 텔레메트리를 NV21 프레임에 직접 합성하는 렌더러.
  *
  * <p>전략: NV21 전체를 Bitmap으로 변환하지 않고,
- * 오버레이 영역(~200x56px)의 Bitmap만 유지합니다.
- * 속도 변화 시에만 Bitmap을 재렌더링하고,
+ * 오버레이 영역의 Bitmap만 유지합니다.
+ * 속도/기어/방향지시등 변화 시에만 Bitmap을 재렌더링하고,
  * 매 프레임에는 Bitmap Y값을 NV21 Y채널에 알파 블렌딩합니다.
+ *
+ * <p>높이: GPS만 표시 시 56px, 텔레메트리 포함 시 90px. Bitmap은 항상 최대 크기로 생성.
  */
 public final class GpsOverlayRenderer {
     private static final int OVERLAY_WIDTH = 220;
-    private static final int OVERLAY_HEIGHT = 56;
+    private static final int OVERLAY_HEIGHT_BASE = 56;
+    private static final int OVERLAY_HEIGHT_EXTENDED = 90;
     private static final int OVERLAY_PADDING = 8;
     private static final int SPEED_TEXT_SIZE = 32;
     private static final int INFO_TEXT_SIZE = 16;
+    private static final int GEAR_TEXT_SIZE = 14;
     /** 오버레이 배경의 NV21 Y값 (반투명 검정) */
     private static final int BG_ALPHA = 140;
 
     private final Paint speedPaint;
     private final Paint infoPaint;
     private final Paint shadowPaint;
+    private final Paint gearActivePaint;
+    private final Paint gearInactivePaint;
+    private final Paint turnActivePaint;
+    private final Paint turnInactivePaint;
 
-    private Bitmap overlayBitmap;
-    private Canvas overlayCanvas;
+    private final Bitmap overlayBitmap;
+    private final Canvas overlayCanvas;
 
     private boolean enabled;
     private boolean useKmh;
     private boolean showCoordinates;
 
+    /** 최신 차량 텔레메트리 */
+    private volatile VehicleTelemetry latestTelemetry = VehicleTelemetry.UNAVAILABLE;
+
     /** 캐싱: 변화 없으면 재렌더링 스킵 */
     private int cachedSpeedInt = Integer.MIN_VALUE;
     private double cachedLat = Double.NaN;
     private double cachedLon = Double.NaN;
+    private int cachedGearBlinkFlags = Integer.MIN_VALUE;
 
     public GpsOverlayRenderer(boolean enabled, boolean useKmh, boolean showCoordinates) {
         this.enabled = enabled;
@@ -63,8 +75,30 @@ public final class GpsOverlayRenderer {
         shadowPaint.setTextSize(SPEED_TEXT_SIZE);
         shadowPaint.setFakeBoldText(true);
 
+        gearActivePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        gearActivePaint.setColor(Color.WHITE);
+        gearActivePaint.setTypeface(Typeface.MONOSPACE);
+        gearActivePaint.setTextSize(GEAR_TEXT_SIZE);
+        gearActivePaint.setFakeBoldText(true);
+
+        gearInactivePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        gearInactivePaint.setColor(Color.argb(120, 180, 180, 180));
+        gearInactivePaint.setTypeface(Typeface.MONOSPACE);
+        gearInactivePaint.setTextSize(GEAR_TEXT_SIZE);
+
+        turnActivePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        turnActivePaint.setColor(Color.rgb(255, 200, 0));
+        turnActivePaint.setTypeface(Typeface.MONOSPACE);
+        turnActivePaint.setTextSize(GEAR_TEXT_SIZE);
+        turnActivePaint.setFakeBoldText(true);
+
+        turnInactivePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        turnInactivePaint.setColor(Color.argb(80, 180, 140, 0));
+        turnInactivePaint.setTypeface(Typeface.MONOSPACE);
+        turnInactivePaint.setTextSize(GEAR_TEXT_SIZE);
+
         overlayBitmap = Bitmap.createBitmap(
-                OVERLAY_WIDTH, OVERLAY_HEIGHT, Bitmap.Config.ARGB_8888);
+                OVERLAY_WIDTH, OVERLAY_HEIGHT_EXTENDED, Bitmap.Config.ARGB_8888);
         overlayCanvas = new Canvas(overlayBitmap);
     }
 
@@ -86,6 +120,11 @@ public final class GpsOverlayRenderer {
         }
     }
 
+    public void updateTelemetry(VehicleTelemetry telemetry) {
+        latestTelemetry = telemetry != null ? telemetry : VehicleTelemetry.UNAVAILABLE;
+        invalidateCache();
+    }
+
     /**
      * GPS 오버레이를 NV21 프레임 우하단에 합성합니다.
      *
@@ -99,13 +138,19 @@ public final class GpsOverlayRenderer {
             return;
         }
 
+        VehicleTelemetry telemetry = latestTelemetry;
+        boolean hasTelemetry = telemetry.isAvailable();
+        int activeHeight = hasTelemetry ? OVERLAY_HEIGHT_EXTENDED : OVERLAY_HEIGHT_BASE;
+
         double displaySpeed = useKmh ? fix.speedKmh : fix.speedKmh * 0.621371;
         int speedInt = (int) displaySpeed;
         double lat = fix.latitude;
         double lon = fix.longitude;
+        int gearBlinkFlags = hasTelemetry ? telemetry.gearBlinkBeltFlags : 0;
 
-        // 캐싱: 속도나 좌표가 바뀔 때만 Bitmap 재렌더링
+        // 캐싱: 속도/좌표/기어/방향지시등이 바뀔 때만 Bitmap 재렌더링
         boolean needsRender = speedInt != cachedSpeedInt
+                || gearBlinkFlags != cachedGearBlinkFlags
                 || (showCoordinates
                         && (Math.abs(lat - cachedLat) > 0.0001
                                 || Math.abs(lon - cachedLon) > 0.0001));
@@ -113,25 +158,32 @@ public final class GpsOverlayRenderer {
             cachedSpeedInt = speedInt;
             cachedLat = lat;
             cachedLon = lon;
-            renderOverlay(speedInt, lat, lon, fix.fresh);
+            cachedGearBlinkFlags = gearBlinkFlags;
+            renderOverlay(speedInt, lat, lon, fix.fresh, telemetry, activeHeight);
         }
 
         // NV21 프레임에 합성: 우하단 배치
         int offsetX = width - OVERLAY_WIDTH - OVERLAY_PADDING;
-        int offsetY = height - OVERLAY_HEIGHT - OVERLAY_PADDING;
+        int offsetY = height - activeHeight - OVERLAY_PADDING;
         if (offsetX < 0 || offsetY < 0) {
             return;
         }
-        blendToNv21(nv21, width, height, offsetX, offsetY);
+        blendToNv21(nv21, width, height, offsetX, offsetY, activeHeight);
     }
 
-    private void renderOverlay(int speedInt, double lat, double lon, boolean fresh) {
+    private void renderOverlay(
+            int speedInt,
+            double lat,
+            double lon,
+            boolean fresh,
+            VehicleTelemetry telemetry,
+            int activeHeight) {
         overlayBitmap.eraseColor(Color.TRANSPARENT);
 
         // 반투명 배경 (검정)
         Paint bgPaint = new Paint();
         bgPaint.setColor(Color.argb(BG_ALPHA, 0, 0, 0));
-        overlayCanvas.drawRect(0, 0, OVERLAY_WIDTH, OVERLAY_HEIGHT, bgPaint);
+        overlayCanvas.drawRect(0, 0, OVERLAY_WIDTH, activeHeight, bgPaint);
 
         // 속도 텍스트 (그림자 + 흰색)
         String unit = useKmh ? "km/h" : "mph";
@@ -156,18 +208,64 @@ public final class GpsOverlayRenderer {
             overlayCanvas.drawText(coordText,
                     OVERLAY_PADDING, SPEED_TEXT_SIZE + INFO_TEXT_SIZE + 2, infoPaint);
         }
+
+        // 텔레메트리 오버레이 (기어 + 방향지시등)
+        if (telemetry.isAvailable()) {
+            renderTelemetryRow(telemetry);
+        }
+    }
+
+    private void renderTelemetryRow(VehicleTelemetry telemetry) {
+        // 기어 행: [P] [R] [N] [D] - 현재 기어 하이라이트
+        int gearRowY = OVERLAY_HEIGHT_BASE + GEAR_TEXT_SIZE + 2;
+        String[] gears = {"P", "R", "N", "D"};
+        int[] gearBits = {0x01, 0x02, 0x04, 0x08};
+        float gearX = OVERLAY_PADDING;
+        for (int i = 0; i < gears.length; i++) {
+            boolean active = (telemetry.gearBlinkBeltFlags & gearBits[i]) != 0;
+            String label = "[" + gears[i] + "]";
+            overlayCanvas.drawText(
+                    label,
+                    gearX,
+                    gearRowY,
+                    active ? gearActivePaint : gearInactivePaint);
+            gearX += GEAR_TEXT_SIZE * 3.2f;
+        }
+
+        // 방향지시등 행: << (좌) ... >> (우)
+        int turnRowY = OVERLAY_HEIGHT_BASE + GEAR_TEXT_SIZE * 2 + 6;
+        boolean leftActive = telemetry.isTurnLeftActive();
+        boolean rightActive = telemetry.isTurnRightActive();
+
+        overlayCanvas.drawText(
+                "<<",
+                OVERLAY_PADDING,
+                turnRowY,
+                leftActive ? turnActivePaint : turnInactivePaint);
+
+        overlayCanvas.drawText(
+                ">>",
+                OVERLAY_WIDTH - OVERLAY_PADDING - GEAR_TEXT_SIZE * 2.5f,
+                turnRowY,
+                rightActive ? turnActivePaint : turnInactivePaint);
     }
 
     /**
      * overlayBitmap의 픽셀을 NV21 Y채널에 알파 블렌딩합니다.
      * UV채널은 반투명 배경 영역에서만 중립값(128)으로 리셋합니다.
      */
-    private void blendToNv21(byte[] nv21, int width, int height, int offsetX, int offsetY) {
+    private void blendToNv21(
+            byte[] nv21,
+            int width,
+            int height,
+            int offsetX,
+            int offsetY,
+            int activeHeight) {
         int ySize = width * height;
-        int[] pixels = new int[OVERLAY_WIDTH * OVERLAY_HEIGHT];
-        overlayBitmap.getPixels(pixels, 0, OVERLAY_WIDTH, 0, 0, OVERLAY_WIDTH, OVERLAY_HEIGHT);
+        int[] pixels = new int[OVERLAY_WIDTH * activeHeight];
+        overlayBitmap.getPixels(pixels, 0, OVERLAY_WIDTH, 0, 0, OVERLAY_WIDTH, activeHeight);
 
-        for (int row = 0; row < OVERLAY_HEIGHT && (offsetY + row) < height; row++) {
+        for (int row = 0; row < activeHeight && (offsetY + row) < height; row++) {
             int nv21Row = offsetY + row;
             for (int col = 0; col < OVERLAY_WIDTH && (offsetX + col) < width; col++) {
                 int pixel = pixels[row * OVERLAY_WIDTH + col];
@@ -191,7 +289,7 @@ public final class GpsOverlayRenderer {
         }
 
         // UV 채널: 배경 영역을 중립(128,128)으로 리셋하여 탈색 방지
-        for (int row = 0; row < OVERLAY_HEIGHT / 2; row++) {
+        for (int row = 0; row < activeHeight / 2; row++) {
             int uvRow = (offsetY / 2) + row;
             if (uvRow * 2 + 1 >= height) {
                 break;
@@ -219,5 +317,6 @@ public final class GpsOverlayRenderer {
         cachedSpeedInt = Integer.MIN_VALUE;
         cachedLat = Double.NaN;
         cachedLon = Double.NaN;
+        cachedGearBlinkFlags = Integer.MIN_VALUE;
     }
 }

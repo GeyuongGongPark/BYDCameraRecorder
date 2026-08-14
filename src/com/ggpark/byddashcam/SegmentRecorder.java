@@ -50,7 +50,9 @@ public final class SegmentRecorder {
     private boolean started;
     private boolean autoLockNextSegment;
     private final GpxTrackWriter gpxTrackWriter = new GpxTrackWriter();
+    private final TelemetryWriter telemetryWriter = new TelemetryWriter();
     private volatile GpsFix latestGpsFix = GpsFix.UNAVAILABLE;
+    private volatile VehicleTelemetry latestTelemetry = VehicleTelemetry.UNAVAILABLE;
 
     // Pre-buffer support: keep recent short segments during parking standby
     // so that the footage before an impact event is retained.
@@ -193,6 +195,11 @@ public final class SegmentRecorder {
         latestGpsFix = fix != null ? fix : GpsFix.UNAVAILABLE;
     }
 
+    /** 차량 텔레메트리를 업데이트합니다. CameraRecorderService에서 텔레메트리 콜백 시 호출. */
+    public void updateTelemetry(VehicleTelemetry telemetry) {
+        latestTelemetry = telemetry != null ? telemetry : VehicleTelemetry.UNAVAILABLE;
+    }
+
     public void offerFrame(FrameProcessor.ProcessedFrame frame) throws IOException {
         if (!started) {
             return;
@@ -220,6 +227,10 @@ public final class SegmentRecorder {
         if (settings.gpsTrackEnabled) {
             gpxTrackWriter.offerFix(latestGpsFix, System.currentTimeMillis());
         }
+        // 텔레메트리 기록
+        if (settings.telemetryEnabled) {
+            telemetryWriter.offer(latestTelemetry, frame.monotonicNanos);
+        }
     }
 
     public void stop() {
@@ -242,6 +253,8 @@ public final class SegmentRecorder {
     private void closeActiveSegment(boolean completed) {
         // GPX 파일 먼저 닫기 (activeDirectory 유효한 동안)
         gpxTrackWriter.close(activeDirectory);
+        // 텔레메트리 파일 닫기
+        telemetryWriter.close();
         boolean allFinalized = completed && !encoders.isEmpty();
         for (AvcMp4Encoder encoder : encoders) {
             try {
@@ -442,6 +455,14 @@ public final class SegmentRecorder {
                 gpxTrackWriter.open(activeDirectory);
             } catch (IOException exception) {
                 Log.w(TAG, "GPX file open failed, GPS track will not be saved", exception);
+            }
+        }
+        // 텔레메트리 파일 열기
+        if (settings.telemetryEnabled) {
+            try {
+                telemetryWriter.open(activeDirectory, segmentStartedNanos);
+            } catch (IOException exception) {
+                Log.w(TAG, "Telemetry file open failed, telemetry will not be saved", exception);
             }
         }
         // 주차 감시 충격 세그먼트 자동 잠금
