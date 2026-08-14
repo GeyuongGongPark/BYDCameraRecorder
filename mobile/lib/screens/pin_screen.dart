@@ -25,7 +25,7 @@ class _PinScreenState extends State<PinScreen> {
       _pin += digit;
       _error = null;
     });
-    if (_pin.length >= 4) _submit();
+    if (_pin.length >= 6) _submit();
   }
 
   void _backspace() {
@@ -108,7 +108,7 @@ class _PinScreenState extends State<PinScreen> {
   Widget _pinDots() => Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(
-          _pin.isEmpty ? 4 : _pin.length,
+          _pin.isEmpty ? 6 : _pin.length,
           (i) => Container(
             margin: const EdgeInsets.symmetric(horizontal: 6),
             width: 14,
