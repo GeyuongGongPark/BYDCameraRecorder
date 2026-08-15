@@ -573,7 +573,9 @@ public final class SegmentRecorder {
                 writer.write("  \"eventType\": "
                         + PhoneJson.quote(pendingEventType)
                         + ",\n");
-                writer.write("  \"gForce\": " + pendingGForce + "\n");
+                float safeGForce = Float.isNaN(pendingGForce) || Float.isInfinite(pendingGForce)
+                        ? 0f : pendingGForce;
+                writer.write("  \"gForce\": " + safeGForce + "\n");
             } else {
                 writer.write("  \"eventType\": null\n");
             }

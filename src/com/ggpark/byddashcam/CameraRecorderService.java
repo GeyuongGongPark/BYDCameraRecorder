@@ -2028,7 +2028,7 @@ public final class CameraRecorderService extends Service
         json.append(",\"eventType\":")
                 .append(eventType != null ? PhoneJson.quote(eventType) : "null")
                 .append(",\"gForce\":")
-                .append(gForce)
+                .append(Float.isNaN(gForce) || Float.isInfinite(gForce) ? 0.0f : gForce)
                 .append(",\"isPreBuffer\":")
                 .append(isPreBuffer);
         json.append("]}");
