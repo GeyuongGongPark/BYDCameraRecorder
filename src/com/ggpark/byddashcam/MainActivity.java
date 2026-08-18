@@ -59,6 +59,7 @@ public final class MainActivity extends Activity
     public static final String EXTRA_SHOW_BACKGROUND_ACCESS =
             "show_background_access";
     private static final int CAMERA_PERMISSION_REQUEST = 100;
+    private static final int LOCATION_PERMISSION_REQUEST = 101;
     private static final String TAG = "BYDCamera";
     private static final long GIBIBYTE_BYTES =
             1024L * 1024L * 1024L;
@@ -269,6 +270,7 @@ public final class MainActivity extends Activity
         setContentView(buildContentView());
         populateInputs();
         ensureCameraPermission();
+        ensureLocationPermission();
         Intent serviceIntent = new Intent(this, CameraRecorderService.class);
         startService(serviceIntent);
         bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE);
@@ -4718,6 +4720,16 @@ public final class MainActivity extends Activity
             requestPermissions(
                     FrameSourceFactory.requiredCameraPermissions(),
                     CAMERA_PERMISSION_REQUEST);
+        }
+    }
+
+    private void ensureLocationPermission() {
+        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                    new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION},
+                    LOCATION_PERMISSION_REQUEST);
         }
     }
 
