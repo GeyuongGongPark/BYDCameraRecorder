@@ -81,6 +81,11 @@ public final class CameraRecorderService extends Service
     // 주차 대기 중 프리버퍼 세그먼트 길이 (초)
     private static final int PRE_BUFFER_SECONDS = 12;
     private static final long INITIAL_RECOVERY_DELAY_MILLIS = 15_000L;
+    // 자동 주차 모드 전환
+    private static final String KEY_AUTO_MODE_SWITCH = "auto_mode_switch_enabled";
+    private static final double AUTO_PARK_SPEED_THRESHOLD_KMH = 5.0;
+    private static final long AUTO_PARK_DELAY_MS = 30_000L;  // 30초 정지 후 주차 감시 진입
+    private static final long AUTO_RESUME_DELAY_MS = 3_000L; // 3초 후 주행 복귀 확정
     private static final long RECOVERY_INTERVAL_MILLIS = 60_000L;
     private static final long FIRST_RECORDING_FRAME_TIMEOUT_MILLIS = 20_000L;
     private static final String TAG = "BYDCamera";
@@ -184,6 +189,15 @@ public final class CameraRecorderService extends Service
     private GpsOverlayRenderer gpsOverlayRenderer;
     private VehicleDataProvider vehicleDataProvider;
     private ParkingGuardController parkingGuardController;
+    // 자동 주차/주행 모드 전환용
+    private volatile double lastSpeedKmh = -1.0;
+    private volatile boolean lastSpeedFromGps = false;
+    private final Runnable autoParkRunnable = new Runnable() {
+        @Override public void run() { tryAutoPark(); }
+    };
+    private final Runnable autoResumeRunnable = new Runnable() {
+        @Override public void run() { tryAutoResume(); }
+    };
     private TelegramNotifier telegramNotifier;
     private MqttPublisher mqttPublisher;
     private SystemMonitor systemMonitor;
@@ -967,6 +981,10 @@ public final class CameraRecorderService extends Service
     private void onGpsFixUpdated(GpsFix fix) {
         frameProcessor.updateGpsFix(fix);
         segmentRecorder.updateGpsFix(fix);
+        if (fix != null && fix.isAvailable()) {
+            lastSpeedFromGps = true;
+            onSpeedUpdated(fix.speedKmh);
+        }
     }
 
     private void startVehicleTelemetry(RecorderSettings settings) {
@@ -990,12 +1008,83 @@ public final class CameraRecorderService extends Service
         }
     }
 
+    private boolean isAutoModeSwitchEnabled() {
+        return getSharedPreferences("recorder_settings", MODE_PRIVATE)
+                .getBoolean(KEY_AUTO_MODE_SWITCH, true);
+    }
+
+    /**
+     * 속도가 업데이트될 때마다 호출됩니다.
+     * 녹화 중 → 정지 30초 → 주차 감시 자동 진입
+     * 주차 감시 중 → 주행 감지 → 즉시 녹화 복귀
+     */
+    private void onSpeedUpdated(double speedKmh) {
+        lastSpeedKmh = speedKmh;
+        if (!isAutoModeSwitchEnabled()) {
+            return;
+        }
+        Mode currentMode = mode;
+        if (currentMode == Mode.RECORDING) {
+            if (speedKmh <= AUTO_PARK_SPEED_THRESHOLD_KMH) {
+                // 정지 상태: 딜레이 후 주차 감시 진입
+                if (!mainHandler.hasCallbacks(autoParkRunnable)) {
+                    mainHandler.postDelayed(autoParkRunnable, AUTO_PARK_DELAY_MS);
+                }
+            } else {
+                // 주행 중: 주차 예약 취소
+                mainHandler.removeCallbacks(autoParkRunnable);
+            }
+        } else if (currentMode == Mode.PARKING_STANDBY
+                || currentMode == Mode.PARKING_RECORDING) {
+            if (speedKmh > AUTO_PARK_SPEED_THRESHOLD_KMH) {
+                // 주행 감지: 딜레이 후 녹화 복귀 (순간 속도 오탐 방지)
+                mainHandler.removeCallbacks(autoParkRunnable);
+                if (!mainHandler.hasCallbacks(autoResumeRunnable)) {
+                    mainHandler.postDelayed(autoResumeRunnable, AUTO_RESUME_DELAY_MS);
+                }
+            } else {
+                mainHandler.removeCallbacks(autoResumeRunnable);
+            }
+        } else {
+            mainHandler.removeCallbacks(autoParkRunnable);
+            mainHandler.removeCallbacks(autoResumeRunnable);
+        }
+    }
+
+    private synchronized void tryAutoPark() {
+        if (mode != Mode.RECORDING) {
+            return;
+        }
+        if (lastSpeedKmh > AUTO_PARK_SPEED_THRESHOLD_KMH) {
+            return; // 속도가 다시 올라간 경우 취소
+        }
+        Log.i(TAG, "Auto-switching to parking mode (speed=" + lastSpeedKmh + " km/h)");
+        enterParkingMode();
+    }
+
+    private synchronized void tryAutoResume() {
+        if (mode != Mode.PARKING_STANDBY && mode != Mode.PARKING_RECORDING) {
+            return;
+        }
+        if (lastSpeedKmh <= AUTO_PARK_SPEED_THRESHOLD_KMH) {
+            return; // 다시 정지한 경우 취소
+        }
+        Log.i(TAG, "Auto-resuming recording (speed=" + lastSpeedKmh + " km/h)");
+        exitParkingMode();
+        RecorderSettings settings = RecorderSettings.load(this);
+        startRecording(settings);
+    }
+
     private void onVehicleTelemetryUpdated(VehicleTelemetry telemetry) {
         GpsOverlayRenderer renderer = gpsOverlayRenderer;
         if (renderer != null) {
             renderer.updateTelemetry(telemetry);
         }
         segmentRecorder.updateTelemetry(telemetry);
+        // GPS가 없을 때만 텔레메트리 속도 사용 (GPS 우선)
+        if (!lastSpeedFromGps && telemetry != null && telemetry.isAvailable()) {
+            onSpeedUpdated(telemetry.speedKmh);
+        }
     }
 
     /** 주차 감시 모드로 진입합니다. */
