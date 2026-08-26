@@ -5,7 +5,8 @@ BYD 차량의 내장 AVM 카메라를 활용한 안드로이드 블랙박스 앱
 ## 기능
 
 - **4채널 360° 녹화** — 전/후/좌/우 카메라를 동시에 H.264로 인코딩
-- **GPS/속도 오버레이** — 영상에 속도·좌표·시각 실시간 합성, GPX 트랙 저장
+- **텔레메트리 오버레이** — 영상·프리뷰에 속도·기어(P/R/N/D)·방향지시등·액셀/브레이크·전조등 실시간 합성
+- **GPS 오버레이** — 속도(km/h·mph)·좌표를 영상에 직접 새김, GPX 트랙 저장
 - **주차 감시 모드** — 가속도 센서로 충격 감지 시 자동 녹화·세그먼트 잠금
 - **스마트폰 원격 접속** — 차량 Wi-Fi로 연결 후 브라우저 또는 Flutter 앱에서 영상 확인 및 다운로드
 - **세그먼트 자동 관리** — 용량 초과 시 오래된 세그먼트 자동 삭제 (잠금 영상 보호)
@@ -79,6 +80,9 @@ src/                  Java 소스
   CameraRecorderService 포그라운드 서비스 (녹화 제어)
   FrameProcessor        프레임 처리 및 오버레이 합성
   GpsDataProvider       GPS 데이터 수집
+  GpsOverlayRenderer    GPS·텔레메트리 오버레이 합성 (NV21·Bitmap 양쪽 지원)
+  VehicleDataProvider   BYD 차량 API 폴링 (속도·기어·방향지시등·조명)
+  VehicleTelemetry      텔레메트리 데이터 스냅샷 (불변)
   ImpactDetector        충격 감지 (가속도 센서)
   ParkingGuardController 주차 감시 상태 머신
   PhoneAccessServer     스마트폰 Wi-Fi 접속 서버
