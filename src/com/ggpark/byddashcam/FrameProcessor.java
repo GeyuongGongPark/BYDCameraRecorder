@@ -350,6 +350,9 @@ public final class FrameProcessor {
                     0,
                     PREVIEW_CAMERA_WIDTH,
                     PREVIEW_CAMERA_HEIGHT);
+            if (gpsOverlayRenderer != null) {
+                gpsOverlayRenderer.applyToBitmap(bitmap, currentGpsFix);
+            }
         }
         return bitmaps;
     }

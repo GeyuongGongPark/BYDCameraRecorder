@@ -21,7 +21,7 @@ import java.util.Locale;
 public final class GpsOverlayRenderer {
     private static final int OVERLAY_WIDTH = 220;
     private static final int OVERLAY_HEIGHT_BASE = 56;
-    private static final int OVERLAY_HEIGHT_EXTENDED = 90;
+    private static final int OVERLAY_HEIGHT_EXTENDED = 112;
     private static final int OVERLAY_PADDING = 8;
     private static final int SPEED_TEXT_SIZE = 32;
     private static final int INFO_TEXT_SIZE = 16;
@@ -52,6 +52,9 @@ public final class GpsOverlayRenderer {
     private double cachedLat = Double.NaN;
     private double cachedLon = Double.NaN;
     private int cachedGearBlinkFlags = Integer.MIN_VALUE;
+    private int cachedLightFlags = Integer.MIN_VALUE;
+    private int cachedAccelerator = Integer.MIN_VALUE;
+    private int cachedBrake = Integer.MIN_VALUE;
 
     public GpsOverlayRenderer(boolean enabled, boolean useKmh, boolean showCoordinates) {
         this.enabled = enabled;
@@ -126,6 +129,50 @@ public final class GpsOverlayRenderer {
     }
 
     /**
+     * 필요 시 overlayBitmap을 재렌더링하고 activeHeight를 반환합니다.
+     * applyToNv21/applyToBitmap 공용.
+     */
+    private int prepareOverlay(GpsFix fix) {
+        VehicleTelemetry telemetry = latestTelemetry;
+        boolean hasGps = fix != null && fix.isAvailable();
+        boolean hasTelemetry = telemetry.isAvailable();
+
+        int activeHeight = hasTelemetry ? OVERLAY_HEIGHT_EXTENDED : OVERLAY_HEIGHT_BASE;
+
+        double rawSpeedKmh = hasGps ? fix.speedKmh : (hasTelemetry ? telemetry.speedKmh : -1);
+        int speedInt = rawSpeedKmh < 0 ? -1
+                : (int) (useKmh ? rawSpeedKmh : rawSpeedKmh * 0.621371);
+        double lat = hasGps ? fix.latitude : 0.0;
+        double lon = hasGps ? fix.longitude : 0.0;
+        boolean gpsFresh = hasGps && fix.fresh;
+        boolean showCoords = showCoordinates && hasGps;
+        int gearBlinkFlags = hasTelemetry ? telemetry.gearBlinkBeltFlags : 0;
+        int lightFlagsVal = hasTelemetry ? telemetry.lightFlags : 0;
+        int accelerator = hasTelemetry ? telemetry.acceleratorPercent : 0;
+        int brake = hasTelemetry ? telemetry.brakePercent : 0;
+
+        boolean needsRender = speedInt != cachedSpeedInt
+                || gearBlinkFlags != cachedGearBlinkFlags
+                || lightFlagsVal != cachedLightFlags
+                || accelerator != cachedAccelerator
+                || brake != cachedBrake
+                || (showCoords
+                        && (Math.abs(lat - cachedLat) > 0.0001
+                                || Math.abs(lon - cachedLon) > 0.0001));
+        if (needsRender) {
+            cachedSpeedInt = speedInt;
+            cachedLat = lat;
+            cachedLon = lon;
+            cachedGearBlinkFlags = gearBlinkFlags;
+            cachedLightFlags = lightFlagsVal;
+            cachedAccelerator = accelerator;
+            cachedBrake = brake;
+            renderOverlay(speedInt, lat, lon, gpsFresh, showCoords, telemetry, activeHeight);
+        }
+        return activeHeight;
+    }
+
+    /**
      * GPS 오버레이를 NV21 프레임 우하단에 합성합니다.
      *
      * @param nv21   NV21 바이트 배열 (수정됨)
@@ -137,49 +184,33 @@ public final class GpsOverlayRenderer {
         if (!enabled) {
             return;
         }
-
-        VehicleTelemetry telemetry = latestTelemetry;
-        boolean hasGps = fix != null && fix.isAvailable();
-        boolean hasTelemetry = telemetry.isAvailable();
-
-        // GPS 또는 텔레메트리 중 하나라도 있어야 오버레이 표시
-        if (!hasGps && !hasTelemetry) {
-            return;
-        }
-
-        int activeHeight = hasTelemetry ? OVERLAY_HEIGHT_EXTENDED : OVERLAY_HEIGHT_BASE;
-
-        // 속도: GPS 우선, 없으면 BYD 텔레메트리 속도
-        double speedKmh = hasGps ? fix.speedKmh : telemetry.speedKmh;
-        double displaySpeed = useKmh ? speedKmh : speedKmh * 0.621371;
-        int speedInt = (int) displaySpeed;
-        double lat = hasGps ? fix.latitude : 0.0;
-        double lon = hasGps ? fix.longitude : 0.0;
-        boolean gpsFresh = hasGps && fix.fresh;
-        boolean showCoords = showCoordinates && hasGps;
-        int gearBlinkFlags = hasTelemetry ? telemetry.gearBlinkBeltFlags : 0;
-
-        // 캐싱: 속도/좌표/기어/방향지시등이 바뀔 때만 Bitmap 재렌더링
-        boolean needsRender = speedInt != cachedSpeedInt
-                || gearBlinkFlags != cachedGearBlinkFlags
-                || (showCoords
-                        && (Math.abs(lat - cachedLat) > 0.0001
-                                || Math.abs(lon - cachedLon) > 0.0001));
-        if (needsRender) {
-            cachedSpeedInt = speedInt;
-            cachedLat = lat;
-            cachedLon = lon;
-            cachedGearBlinkFlags = gearBlinkFlags;
-            renderOverlay(speedInt, lat, lon, gpsFresh, showCoords, telemetry, activeHeight);
-        }
-
-        // NV21 프레임에 합성: 우하단 배치
+        int activeHeight = prepareOverlay(fix);
         int offsetX = width - OVERLAY_WIDTH - OVERLAY_PADDING;
         int offsetY = height - activeHeight - OVERLAY_PADDING;
         if (offsetX < 0 || offsetY < 0) {
             return;
         }
         blendToNv21(nv21, width, height, offsetX, offsetY, activeHeight);
+    }
+
+    /**
+     * GPS 오버레이를 Bitmap 우하단에 합성합니다. 프리뷰 표시에 사용.
+     *
+     * @param bitmap 수정할 Bitmap (mutable이어야 함)
+     * @param fix    현재 GPS fix
+     */
+    public void applyToBitmap(Bitmap bitmap, GpsFix fix) {
+        if (!enabled) {
+            return;
+        }
+        int activeHeight = prepareOverlay(fix);
+        int offsetX = bitmap.getWidth() - OVERLAY_WIDTH - OVERLAY_PADDING;
+        int offsetY = bitmap.getHeight() - activeHeight - OVERLAY_PADDING;
+        if (offsetX < 0 || offsetY < 0) {
+            return;
+        }
+        Canvas canvas = new Canvas(bitmap);
+        canvas.drawBitmap(overlayBitmap, offsetX, offsetY, null);
     }
 
     private void renderOverlay(
@@ -199,7 +230,9 @@ public final class GpsOverlayRenderer {
 
         // 속도 텍스트 (그림자 + 흰색)
         String unit = useKmh ? "km/h" : "mph";
-        String speedText = String.format(Locale.US, "%3d %s", speedInt, unit);
+        String speedText = speedInt < 0
+                ? String.format(Locale.US, "--- %s", unit)
+                : String.format(Locale.US, "%3d %s", speedInt, unit);
 
         shadowPaint.setTextSize(SPEED_TEXT_SIZE);
         overlayCanvas.drawText(speedText, OVERLAY_PADDING + 1, SPEED_TEXT_SIZE + 1, shadowPaint);
@@ -260,6 +293,28 @@ public final class GpsOverlayRenderer {
                 OVERLAY_WIDTH - OVERLAY_PADDING - GEAR_TEXT_SIZE * 2.5f,
                 turnRowY,
                 rightActive ? turnActivePaint : turnInactivePaint);
+
+        // 액셀/브레이크/전조등 행
+        int pedalsRowY = OVERLAY_HEIGHT_BASE + GEAR_TEXT_SIZE * 3 + 10;
+        String pedalText = String.format(Locale.US,
+                "A:%2d%% B:%2d%%", telemetry.acceleratorPercent, telemetry.brakePercent);
+        overlayCanvas.drawText(pedalText, OVERLAY_PADDING, pedalsRowY, infoPaint);
+
+        String lightText = buildLightText(telemetry.lightFlags);
+        if (!lightText.isEmpty()) {
+            float lightX = OVERLAY_WIDTH - OVERLAY_PADDING
+                    - infoPaint.measureText(lightText);
+            overlayCanvas.drawText(lightText, lightX, pedalsRowY, turnActivePaint);
+        }
+    }
+
+    /** lightFlags 비트를 가장 우선순위 높은 전조등 상태 텍스트로 변환. */
+    private static String buildLightText(int flags) {
+        if ((flags & 0x04) != 0) return "[HB]";  // 상향등
+        if ((flags & 0x02) != 0) return "[HL]";  // 하향등
+        if ((flags & 0x08) != 0) return "[FG]";  // 안개등
+        if ((flags & 0x01) != 0) return "[PL]";  // 위치등
+        return "";
     }
 
     /**
@@ -330,5 +385,8 @@ public final class GpsOverlayRenderer {
         cachedLat = Double.NaN;
         cachedLon = Double.NaN;
         cachedGearBlinkFlags = Integer.MIN_VALUE;
+        cachedLightFlags = Integer.MIN_VALUE;
+        cachedAccelerator = Integer.MIN_VALUE;
+        cachedBrake = Integer.MIN_VALUE;
     }
 }
