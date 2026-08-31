@@ -326,6 +326,19 @@ public final class PhoneAccessServer implements Closeable {
             sendJson(output, 200, buf != null ? buf.toJson() : "[]");
             return;
         }
+        if (relativePath.equals("api/debug/logs.txt") && request.method.equals("GET")) {
+            LogBuffer buf = logBuffer;
+            StringBuilder sb = new StringBuilder();
+            if (buf != null) {
+                for (String line : buf.snapshot()) {
+                    sb.append(line).append("\n");
+                }
+            }
+            byte[] body = sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            sendBytes(output, 200, "text/plain; charset=utf-8", body,
+                    "Content-Disposition: attachment; filename=\"byd-telemetry-log.txt\"\r\n");
+            return;
+        }
         if (relativePath.equals("api/system") && request.method.equals("GET")) {
             SystemMonitor.Snapshot snap = service.getSystemSnapshot();
             sendJson(output, 200, snap != null ? snap.toJson() : "{}");
