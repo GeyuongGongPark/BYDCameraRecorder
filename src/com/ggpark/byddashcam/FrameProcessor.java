@@ -350,9 +350,7 @@ public final class FrameProcessor {
                     0,
                     PREVIEW_CAMERA_WIDTH,
                     PREVIEW_CAMERA_HEIGHT);
-            if (gpsOverlayRenderer != null) {
-                gpsOverlayRenderer.applyToBitmap(bitmap, currentGpsFix);
-            }
+            // 오버레이는 TelemetryOverlayView(View)가 처리합니다.
         }
         return bitmaps;
     }

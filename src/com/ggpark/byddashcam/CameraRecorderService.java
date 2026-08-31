@@ -54,6 +54,8 @@ public final class CameraRecorderService extends Service
         void onPreviewFrames(Bitmap[] frames);
         void onServiceState(Mode mode, String message);
         void onRecorderSettingsChanged();
+        void onTelemetryUpdated(VehicleTelemetry telemetry);
+        void onGpsFixUpdated(GpsFix fix);
     }
 
     public final class LocalBinder extends Binder {
@@ -151,6 +153,7 @@ public final class CameraRecorderService extends Service
     private volatile RecorderSettings pendingRecordingSettings;
     private volatile String lastStateMessage = "Not recording";
     private volatile UiListener uiListener;
+    private final LogBuffer logBuffer = new LogBuffer();
     private FrameSource frameSource;
     private PhoneAccessServer phoneAccessServer;
     private Bitmap[] pendingPreviewFrames;
@@ -834,6 +837,7 @@ public final class CameraRecorderService extends Service
                         this,
                         effectiveSettings.phoneAccessCode,
                         effectiveSettings.phoneAccessPin);
+                phoneAccessServer.setLogBuffer(logBuffer);
             } catch (IOException | RuntimeException exception) {
                 Log.e(TAG, "Cannot start phone app access", exception);
                 String detail = exception.getMessage();
@@ -985,6 +989,10 @@ public final class CameraRecorderService extends Service
             lastSpeedFromGps = true;
             onSpeedUpdated(fix.speedKmh);
         }
+        UiListener ui = uiListener;
+        if (ui != null) {
+            ui.onGpsFixUpdated(fix);
+        }
     }
 
     private void startVehicleTelemetry(RecorderSettings settings) {
@@ -992,6 +1000,7 @@ public final class CameraRecorderService extends Service
             return;
         }
         vehicleDataProvider = new VehicleDataProvider();
+        vehicleDataProvider.setLogBuffer(logBuffer);
         vehicleDataProvider.setListener(new VehicleDataProvider.Listener() {
             @Override
             public void onTelemetryUpdated(VehicleTelemetry telemetry) {
@@ -1084,6 +1093,10 @@ public final class CameraRecorderService extends Service
         // GPS가 없을 때만 텔레메트리 속도 사용 (GPS 우선)
         if (!lastSpeedFromGps && telemetry != null && telemetry.isAvailable()) {
             onSpeedUpdated(telemetry.speedKmh);
+        }
+        UiListener ui = uiListener;
+        if (ui != null) {
+            ui.onTelemetryUpdated(telemetry);
         }
     }
 

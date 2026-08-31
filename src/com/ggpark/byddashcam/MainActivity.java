@@ -140,6 +140,8 @@ public final class MainActivity extends Activity
     private final ExecutorService segmentPreviewExecutor =
             Executors.newSingleThreadExecutor();
     private FrameLayout cameraOverlay;
+    private TelemetryOverlayView telemetryOverlayView;
+    private TelemetryOverlayView fullscreenTelemetryOverlayView;
     private LinearLayout controlsColumn;
     private boolean controlsColumnAnimating;
     private boolean controlsColumnCollapsed;
@@ -430,6 +432,22 @@ public final class MainActivity extends Activity
         showMessage(getString(R.string.msg_settings_updated_phone));
     }
 
+    @Override
+    public void onTelemetryUpdated(VehicleTelemetry telemetry) {
+        TelemetryOverlayView v1 = telemetryOverlayView;
+        if (v1 != null) v1.updateTelemetry(telemetry);
+        TelemetryOverlayView v2 = fullscreenTelemetryOverlayView;
+        if (v2 != null) v2.updateTelemetry(telemetry);
+    }
+
+    @Override
+    public void onGpsFixUpdated(GpsFix fix) {
+        TelemetryOverlayView v1 = telemetryOverlayView;
+        if (v1 != null) v1.updateGpsFix(fix);
+        TelemetryOverlayView v2 = fullscreenTelemetryOverlayView;
+        if (v2 != null) v2.updateGpsFix(fix);
+    }
+
     private View buildContentView() {
         FrameLayout screen = new FrameLayout(this);
         LinearLayout root = vertical();
@@ -502,8 +520,21 @@ public final class MainActivity extends Activity
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         0,
                         1f));
-        previewColumn.addView(
+        // previewGrid + TelemetryOverlayView (native rendering 경로 오버레이)
+        FrameLayout previewWrapper = new FrameLayout(this);
+        previewWrapper.addView(
                 previewGrid,
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT));
+        telemetryOverlayView = new TelemetryOverlayView(this);
+        previewWrapper.addView(
+                telemetryOverlayView,
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT));
+        previewColumn.addView(
+                previewWrapper,
                 new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         0,
@@ -1752,6 +1783,14 @@ public final class MainActivity extends Activity
                         Gravity.TOP);
         cameraOverlay.addView(topBar, topBarParams);
         fullscreenTopBar = topBar;
+
+        // fullscreen에도 telemetry overlay 추가 (topBar 뒤, 카메라 위)
+        fullscreenTelemetryOverlayView = new TelemetryOverlayView(this);
+        fullscreenTelemetryOverlayView.setUseKmh(true);
+        cameraOverlay.addView(fullscreenTelemetryOverlayView,
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT));
         return cameraOverlay;
     }
 
@@ -3639,6 +3678,16 @@ public final class MainActivity extends Activity
         if (gpsSpeedUnitSpinner != null) {
             SpeedUnitAdapter adapter = (SpeedUnitAdapter) gpsSpeedUnitSpinner.getAdapter();
             gpsSpeedUnitSpinner.setSelection(adapter.indexOf(settings.gpsSpeedUnit));
+        }
+        boolean useKmh = "kmh".equals(settings.gpsSpeedUnit);
+        boolean overlayEnabled = settings.gpsOverlayEnabled;
+        if (telemetryOverlayView != null) {
+            telemetryOverlayView.setEnabled(overlayEnabled);
+            telemetryOverlayView.setUseKmh(useKmh);
+        }
+        if (fullscreenTelemetryOverlayView != null) {
+            fullscreenTelemetryOverlayView.setEnabled(overlayEnabled);
+            fullscreenTelemetryOverlayView.setUseKmh(useKmh);
         }
         if (gpsShowCoordinatesCheckbox != null) {
             gpsShowCoordinatesCheckbox.setChecked(settings.gpsShowCoordinates);

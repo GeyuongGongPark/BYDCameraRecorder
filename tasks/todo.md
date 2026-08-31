@@ -47,6 +47,15 @@
 - [x] FilesScreen 전체/이벤트 탭
 - [x] 이벤트 카드 시각적 강조 (오렌지·파란 테두리, ⚡/🏃 아이콘, G-force 표시)
 
+## Phase 7: 텔레메트리 디버그 + 프리뷰 오버레이
+- [x] `LogBuffer.java` — 최근 500개 로그 순환 저장, JSON 직렬화
+- [x] `VehicleDataProvider.java` — raw API 값 변경 시 LogBuffer 기록 (BYDRaw 태그)
+- [x] `TelemetryOverlayView.java` — native TextureView 위 오버레이 custom View (방향지시등 깜빡임 포함)
+- [x] `CameraRecorderService.java` — LogBuffer 필드, UiListener에 onTelemetryUpdated + onGpsFixUpdated 추가
+- [x] `PhoneAccessServer.java` — GET /api/debug/logs 엔드포인트
+- [x] `FrameProcessor.java` — applyToBitmap 제거 (TelemetryOverlayView로 대체)
+- [x] `MainActivity.java` — TelemetryOverlayView를 메인 그리드 + fullscreen에 추가, UiListener 구현
+
 ## Phase 6: 외부 연동
 - [x] Telegram 충격/모션 이벤트 알림
 - [x] MQTT (Home Assistant Discovery)

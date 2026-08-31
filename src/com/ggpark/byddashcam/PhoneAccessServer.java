@@ -86,6 +86,7 @@ public final class PhoneAccessServer implements Closeable {
     private final SecureRandom random = new SecureRandom();
     private final SharedPreferences sessionPreferences;
     private final CameraRecorderService service;
+    private volatile LogBuffer logBuffer;
     private final ServerSocket serverSocket;
     private final Thread serverThread;
     private final Map<String, Boolean> sessions = new ConcurrentHashMap<>();
@@ -149,6 +150,10 @@ public final class PhoneAccessServer implements Closeable {
                 PhoneAccessNetwork.findLocalIpv4Address(),
                 PORT,
                 token);
+    }
+
+    public void setLogBuffer(LogBuffer logBuffer) {
+        this.logBuffer = logBuffer;
     }
 
     public void updatePin(String updatedPin) {
@@ -314,6 +319,11 @@ public final class PhoneAccessServer implements Closeable {
         }
         if (relativePath.startsWith("api/") && !isAuthorized(request)) {
             sendJson(output, 401, "{\"authenticated\":false}");
+            return;
+        }
+        if (relativePath.equals("api/debug/logs") && request.method.equals("GET")) {
+            LogBuffer buf = logBuffer;
+            sendJson(output, 200, buf != null ? buf.toJson() : "[]");
             return;
         }
         if (relativePath.equals("api/system") && request.method.equals("GET")) {

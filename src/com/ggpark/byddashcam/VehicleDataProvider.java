@@ -34,10 +34,23 @@ public final class VehicleDataProvider {
 
     private ScheduledExecutorService executor;
     private volatile Listener listener;
+    private volatile LogBuffer logBuffer;
     private boolean anyDeviceAvailable;
+
+    // 이전 raw 값 (변경 시에만 로그)
+    private int prevRawSpeed = Integer.MIN_VALUE;
+    private int prevRawGear = Integer.MIN_VALUE;
+    private int prevRawAccel = Integer.MIN_VALUE;
+    private int prevRawBrake = Integer.MIN_VALUE;
+    private int prevRawTurn = Integer.MIN_VALUE;
+    private int prevRawLight = Integer.MIN_VALUE;
 
     public void setListener(Listener listener) {
         this.listener = listener;
+    }
+
+    public void setLogBuffer(LogBuffer logBuffer) {
+        this.logBuffer = logBuffer;
     }
 
     public void start(Context context) {
@@ -191,6 +204,33 @@ public final class VehicleDataProvider {
                     }
                 } catch (Exception ignored) {
                 }
+            }
+
+            // raw 값이 바뀔 때만 LogBuffer에 기록
+            int rawGear = gearDevice != null ? (gearBlinkBeltFlags & 0x0f) : Integer.MIN_VALUE;
+            int rawTurn = lightDevice != null ? (gearBlinkBeltFlags >> 4) : Integer.MIN_VALUE;
+            int rawLight = lightDevice != null ? lightFlags : Integer.MIN_VALUE;
+            int rawSpeed = speedDevice != null ? speedKmh : Integer.MIN_VALUE;
+            int rawAccel = speedDevice != null ? acceleratorPercent : Integer.MIN_VALUE;
+            int rawBrake = speedDevice != null ? brakePercent : Integer.MIN_VALUE;
+
+            LogBuffer buf = logBuffer;
+            if (buf != null && (rawSpeed != prevRawSpeed || rawGear != prevRawGear
+                    || rawAccel != prevRawAccel || rawBrake != prevRawBrake
+                    || rawTurn != prevRawTurn || rawLight != prevRawLight)) {
+                buf.append("BYDRaw",
+                        "speed=" + speedKmh
+                        + " gear=" + rawGear
+                        + " accel=" + acceleratorPercent
+                        + " brake=" + brakePercent
+                        + " turn=" + (gearBlinkBeltFlags >> 4)
+                        + " light=0x" + Integer.toHexString(lightFlags));
+                prevRawSpeed = rawSpeed;
+                prevRawGear = rawGear;
+                prevRawAccel = rawAccel;
+                prevRawBrake = rawBrake;
+                prevRawTurn = rawTurn;
+                prevRawLight = rawLight;
             }
 
             Listener l = listener;
