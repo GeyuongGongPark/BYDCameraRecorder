@@ -35,6 +35,7 @@
 - [x] **segment.json 이벤트 메타**: `eventType`, `gForce`, `isPreBuffer` 기록·파싱
 - [x] **충격 알림 채널 분리**: `PARKING_CHANNEL_ID` 분리 (`byd_parking_guard`)
 - [x] **주차 감시 설정 UI**: 임계값 스텝퍼 (1.5~5.0G), 녹화 시간 스텝퍼 (30~300s)
+- [x] **속도 기반 자동 전환**: 정지 30초 → 주차 감시 자동 진입, 주행 감지 → 녹화 복귀
 
 ## Phase 4: 인앱 언어 선택
 - [x] `LocaleHelper.java` 작성 (SharedPreferences 기반, ContextWrapper 방식)
@@ -47,22 +48,30 @@
 - [x] FilesScreen 전체/이벤트 탭
 - [x] 이벤트 카드 시각적 강조 (오렌지·파란 테두리, ⚡/🏃 아이콘, G-force 표시)
 
-## Phase 7: 텔레메트리 디버그 + 프리뷰 오버레이
-- [x] `LogBuffer.java` — 최근 500개 로그 순환 저장, JSON 직렬화
-- [x] `VehicleDataProvider.java` — raw API 값 변경 시 LogBuffer 기록 (BYDRaw 태그)
-- [x] `TelemetryOverlayView.java` — native TextureView 위 오버레이 custom View (방향지시등 깜빡임 포함)
-- [x] `CameraRecorderService.java` — LogBuffer 필드, UiListener에 onTelemetryUpdated + onGpsFixUpdated 추가
-- [x] `PhoneAccessServer.java` — GET /api/debug/logs 엔드포인트
-- [x] `FrameProcessor.java` — applyToBitmap 제거 (TelemetryOverlayView로 대체)
-- [x] `MainActivity.java` — TelemetryOverlayView를 메인 그리드 + fullscreen에 추가, UiListener 구현
-
 ## Phase 6: 외부 연동
 - [x] Telegram 충격/모션 이벤트 알림
 - [x] MQTT (Home Assistant Discovery)
 - [x] Cloudflare 터널 (폰앱 외부 접근)
 - [x] 폰앱 (Flutter iOS/Android) — 라이브 프리뷰, 파일 관리, 설정 동기화
 
+## Phase 7: 텔레메트리 디버그 + 프리뷰 오버레이
+- [x] `LogBuffer.java` — 최근 500개 로그 순환 저장, JSON 직렬화
+- [x] `VehicleDataProvider.java` — raw API 값 변경 시 LogBuffer 기록 (BYDRaw 태그)
+- [x] `TelemetryOverlayView.java` — native TextureView 위 오버레이 custom View (방향지시등 깜빡임 포함)
+- [x] `CameraRecorderService.java` — LogBuffer 필드, UiListener에 onTelemetryUpdated + onGpsFixUpdated 추가
+- [x] `PhoneAccessServer.java` — GET /api/debug/logs (JSON), GET /api/debug/logs.txt (파일 다운로드) 엔드포인트
+- [x] `FrameProcessor.java` — applyToBitmap 제거 (TelemetryOverlayView로 대체)
+- [x] `MainActivity.java` — TelemetryOverlayView를 메인 그리드 + fullscreen에 추가, UiListener 구현
+
+## 버그 수정
+- [x] GPS 속도=0일 때 텔레메트리 속도 무시 → 주행 중 주차 감시 자동 전환 오작동
+  - `lastSpeedFromGps` 플래그 제거, `lastGpsSpeedKmh`/`lastTelemetrySpeedKmh` 독립 추적
+  - `Math.max(gps, telemetry)` 기준으로 자동 전환 판단
+- [x] BYD 기어 API 메서드명 오류: `getCurrentGear()` → `getGearboxAutoModeType()`
+- [x] 방향지시등 매핑 오류: 0/1=off, 2/3=left, 4/5=right (kinex 앱 분석으로 확인)
+- [x] 조명 API no-arg 호출 오류: `getLightStatus()` → `getLightStatus(int type)` (type=2 하향등, type=3 상향등)
+
 ## 검증
 - [ ] 에뮬레이터에서 동작 확인
-- [ ] 실제 차량(Atto 3) 탑재 테스트
+- [ ] 실제 차량(Atto 3) 탑재 테스트 — 기어 raw 값 확인 후 P/R/N/D 매핑 검증
 - [ ] 회귀 테스트: 기존 녹화/세그먼트/잠금 기능 정상 동작 확인
