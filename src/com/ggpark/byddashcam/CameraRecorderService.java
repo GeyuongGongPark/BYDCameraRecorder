@@ -194,7 +194,8 @@ public final class CameraRecorderService extends Service
     private ParkingGuardController parkingGuardController;
     // 자동 주차/주행 모드 전환용
     private volatile double lastSpeedKmh = -1.0;
-    private volatile boolean lastSpeedFromGps = false;
+    private volatile double lastGpsSpeedKmh = -1.0;
+    private volatile double lastTelemetrySpeedKmh = -1.0;
     private final Runnable autoParkRunnable = new Runnable() {
         @Override public void run() { tryAutoPark(); }
     };
@@ -986,9 +987,11 @@ public final class CameraRecorderService extends Service
         frameProcessor.updateGpsFix(fix);
         segmentRecorder.updateGpsFix(fix);
         if (fix != null && fix.isAvailable()) {
-            lastSpeedFromGps = true;
-            onSpeedUpdated(fix.speedKmh);
+            lastGpsSpeedKmh = fix.speedKmh;
+        } else {
+            lastGpsSpeedKmh = -1.0;
         }
+        onSpeedUpdated(Math.max(lastGpsSpeedKmh, lastTelemetrySpeedKmh));
         UiListener ui = uiListener;
         if (ui != null) {
             ui.onGpsFixUpdated(fix);
@@ -1090,9 +1093,10 @@ public final class CameraRecorderService extends Service
             renderer.updateTelemetry(telemetry);
         }
         segmentRecorder.updateTelemetry(telemetry);
-        // GPS가 없을 때만 텔레메트리 속도 사용 (GPS 우선)
-        if (!lastSpeedFromGps && telemetry != null && telemetry.isAvailable()) {
-            onSpeedUpdated(telemetry.speedKmh);
+        // GPS/텔레메트리 속도 중 더 큰 값으로 주차 자동전환 판단 (어느 한쪽이라도 주행 중이면 주차 진입 방지)
+        if (telemetry != null && telemetry.isAvailable()) {
+            lastTelemetrySpeedKmh = telemetry.speedKmh;
+            onSpeedUpdated(Math.max(lastGpsSpeedKmh, lastTelemetrySpeedKmh));
         }
         UiListener ui = uiListener;
         if (ui != null) {

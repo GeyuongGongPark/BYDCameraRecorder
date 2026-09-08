@@ -26,11 +26,11 @@ public final class VehicleDataProvider {
     private Method methodGetBrakeDeepness;
 
     private Object gearDevice;
-    private Method methodGetCurrentGear;
+    private Method methodGetGearboxAutoModeType;
 
     private Object lightDevice;
     private Method methodGetTurnLightFlashState;
-    private Method methodGetLightStatus;
+    private Method methodGetLightStatus; // getLightStatus(int type)
 
     private ScheduledExecutorService executor;
     private volatile Listener listener;
@@ -102,7 +102,7 @@ public final class VehicleDataProvider {
                     "android.hardware.bydauto.gearbox.BYDAutoGearboxDevice");
             Method getInstance = cls.getMethod("getInstance", Context.class);
             gearDevice = getInstance.invoke(null, context);
-            methodGetCurrentGear = cls.getMethod("getCurrentGear");
+            methodGetGearboxAutoModeType = cls.getMethod("getGearboxAutoModeType");
             anyDeviceAvailable = true;
             Log.i(TAG, "BYD gear device initialized");
         } catch (Exception e) {
@@ -116,7 +116,7 @@ public final class VehicleDataProvider {
             Method getInstance = cls.getMethod("getInstance", Context.class);
             lightDevice = getInstance.invoke(null, context);
             methodGetTurnLightFlashState = cls.getMethod("getTurnLightFlashState");
-            methodGetLightStatus = cls.getMethod("getLightStatus");
+            methodGetLightStatus = cls.getMethod("getLightStatus", Integer.TYPE);
             anyDeviceAvailable = true;
             Log.i(TAG, "BYD light device initialized");
         } catch (Exception e) {
@@ -160,20 +160,23 @@ public final class VehicleDataProvider {
             int rawGearValue = Integer.MIN_VALUE; // API 원시 반환값 (디버깅용)
             if (gearDevice != null) {
                 try {
-                    Object v = methodGetCurrentGear.invoke(gearDevice);
+                    Object v = methodGetGearboxAutoModeType.invoke(gearDevice);
                     if (v instanceof Number) {
                         int g = ((Number) v).intValue();
                         rawGearValue = g;
-                        // BYD 기어값: -1=R, 0=N, 1=P, 2=D (추정값 — 실제 차량에서 확인 필요)
-                        // 플래그: bit0=P, bit1=R, bit2=N, bit3=D
-                        if (g == 1) {
-                            gearBlinkBeltFlags |= 0x01; // P
-                        } else if (g == -1) {
-                            gearBlinkBeltFlags |= 0x02; // R
-                        } else if (g == 0) {
-                            gearBlinkBeltFlags |= 0x04; // N
-                        } else if (g >= 2) {
-                            gearBlinkBeltFlags |= 0x08; // D
+                        // BYDAutoGearboxDevice.getGearboxAutoModeType() 반환값
+                        // — GEARBOX_AUTO_MODE_P/R/N/D 상수 실제 값은 차량 테스트로 확인
+                        // — raw 값은 오버레이에 ?:X 로 표시됨
+                        // 아래는 공통 AT 순서 추정값 (P=0,R=1,N=2,D=3 또는 P=3,R=2,N=1,D=0)
+                        // 실차 확인 후 수정 필요
+                        if (g == 0) {
+                            gearBlinkBeltFlags |= 0x01; // P 추정
+                        } else if (g == 1) {
+                            gearBlinkBeltFlags |= 0x02; // R 추정
+                        } else if (g == 2) {
+                            gearBlinkBeltFlags |= 0x04; // N 추정
+                        } else if (g == 3) {
+                            gearBlinkBeltFlags |= 0x08; // D 추정
                         }
                     }
                 } catch (Exception ignored) {
@@ -182,14 +185,14 @@ public final class VehicleDataProvider {
 
             if (lightDevice != null) {
                 try {
-                    // 방향지시등: 1=off, 2=left, 4=right, 6=hazard
+                    // 방향지시등: 0/1=off, 2/3=left, 4/5=right (kinex HalLightListener 기준)
                     Object v = methodGetTurnLightFlashState.invoke(lightDevice);
                     if (v instanceof Number) {
                         int state = ((Number) v).intValue();
-                        if (state == 2 || state == 6) {
+                        if (state == 2 || state == 3) {
                             gearBlinkBeltFlags |= (1 << 4); // 좌회전
                         }
-                        if (state == 4 || state == 6) {
+                        if (state == 4 || state == 5) {
                             gearBlinkBeltFlags |= (1 << 5); // 우회전
                         }
                     }
@@ -200,9 +203,14 @@ public final class VehicleDataProvider {
             int lightFlags = 0;
             if (lightDevice != null) {
                 try {
-                    Object v = methodGetLightStatus.invoke(lightDevice);
-                    if (v instanceof Number) {
-                        lightFlags = ((Number) v).intValue() & 0xff;
+                    // type=2: 하향등(low beam), type=3: 상향등(high beam)
+                    Object lowBeam = methodGetLightStatus.invoke(lightDevice, 2);
+                    Object highBeam = methodGetLightStatus.invoke(lightDevice, 3);
+                    if (lowBeam instanceof Number && ((Number) lowBeam).intValue() != 0) {
+                        lightFlags |= 0x02; // bit1=하향등
+                    }
+                    if (highBeam instanceof Number && ((Number) highBeam).intValue() != 0) {
+                        lightFlags |= 0x04; // bit2=상향등
                     }
                 } catch (Exception ignored) {
                 }
@@ -222,7 +230,7 @@ public final class VehicleDataProvider {
                     || rawTurn != prevRawTurn || rawLight != prevRawLight)) {
                 buf.append("BYDRaw",
                         "speed=" + speedKmh
-                        + " gear=" + rawGear
+                        + " gearRaw=" + rawGear
                         + " accel=" + acceleratorPercent
                         + " brake=" + brakePercent
                         + " turn=" + (gearBlinkBeltFlags >> 4)
