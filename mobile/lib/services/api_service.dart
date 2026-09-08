@@ -167,4 +167,26 @@ class ApiService {
   }
 
   String? get sessionCookie => _sessionCookie;
+
+  // ── 디버그 로그 ──────────────────────────────────────────────────────────
+
+  Future<void> downloadDebugLogs(String savePath) async {
+    final uri = Uri.parse('${config.baseUrl}/api/debug/logs.txt');
+    final request = http.Request('GET', uri);
+    request.headers.addAll(_headers);
+    final client = http.Client();
+    try {
+      final response = await client.send(request);
+      if (response.statusCode != 200) {
+        throw ApiException(response.statusCode, 'Debug log download failed');
+      }
+      final sink = File(savePath).openWrite();
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+      }
+      await sink.close();
+    } finally {
+      client.close();
+    }
+  }
 }

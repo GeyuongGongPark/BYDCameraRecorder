@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/recorder_state.dart';
 import '../models/server_config.dart';
 import '../services/api_service.dart';
@@ -26,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   String? _error;
   Timer? _pollTimer;
+  bool _logsDownloading = false;
 
   @override
   void initState() {
@@ -194,6 +197,8 @@ class _HomeScreenState extends State<HomeScreen> {
           _cameraGrid(),
           const SizedBox(height: 16),
           if (_system != null) _systemCard(),
+          const SizedBox(height: 16),
+          _debugLogButton(),
         ],
       ),
     );
@@ -408,6 +413,37 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  Future<void> _downloadDebugLogs() async {
+    setState(() => _logsDownloading = true);
+    try {
+      final tmpDir = await getTemporaryDirectory();
+      final savePath =
+          '${tmpDir.path}/byd-telemetry-${DateTime.now().millisecondsSinceEpoch}.txt';
+      await _api.downloadDebugLogs(savePath);
+      await OpenFile.open(savePath);
+    } catch (e) {
+      if (mounted) _showError('로그 다운로드 실패: $e');
+    } finally {
+      if (mounted) setState(() => _logsDownloading = false);
+    }
+  }
+
+  Widget _debugLogButton() => OutlinedButton.icon(
+    style: OutlinedButton.styleFrom(
+      foregroundColor: Colors.white54,
+      side: const BorderSide(color: Colors.white12),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+    ),
+    icon: _logsDownloading
+        ? const SizedBox(
+            width: 14, height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white38),
+          )
+        : const Icon(Icons.download, size: 16),
+    label: const Text('텔레메트리 디버그 로그 다운로드'),
+    onPressed: _logsDownloading ? null : _downloadDebugLogs,
+  );
 
   Widget _statRow(String label, String value) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 4),
