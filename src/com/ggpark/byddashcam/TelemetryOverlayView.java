@@ -160,8 +160,16 @@ public final class TelemetryOverlayView extends View {
                 offsetX + overlayWidth, offsetY + overlayExtHeight, bgPaint);
 
         // 속도
-        double rawSpeedKmh = hasGps ? fix.speedKmh
-                : (hasTelemetry ? t.speedKmh : -1);
+        double rawSpeedKmh;
+        if (hasGps && fix.speedKmh > 0) {
+            rawSpeedKmh = fix.speedKmh;
+        } else if (hasTelemetry && t.speedKmh > 0) {
+            rawSpeedKmh = t.speedKmh;
+        } else if (hasGps) {
+            rawSpeedKmh = fix.speedKmh;
+        } else {
+            rawSpeedKmh = -1;
+        }
         int speedInt = rawSpeedKmh < 0 ? -1
                 : (int) (useKmh ? rawSpeedKmh : rawSpeedKmh * 0.621371);
         String unit = useKmh ? "km/h" : "mph";
@@ -196,6 +204,11 @@ public final class TelemetryOverlayView extends View {
             canvas.drawText("[" + gears[i] + "]", gearX, gearRowY,
                     active ? gearActivePaint : gearInactivePaint);
             gearX += gearTextSize * 3.2f;
+        }
+
+        // 기어 매핑 디버그: raw API 값 (매핑 미지원 시 ?:X 형태)
+        if (!t.isGearKnown() && t.rawGear != Integer.MIN_VALUE) {
+            canvas.drawText("?:" + t.rawGear, gearX, gearRowY, turnActivePaint);
         }
 
         // 방향지시등 행

@@ -157,12 +157,14 @@ public final class VehicleDataProvider {
             }
 
             int gearBlinkBeltFlags = 0;
+            int rawGearValue = Integer.MIN_VALUE; // API 원시 반환값 (디버깅용)
             if (gearDevice != null) {
                 try {
                     Object v = methodGetCurrentGear.invoke(gearDevice);
                     if (v instanceof Number) {
                         int g = ((Number) v).intValue();
-                        // BYD 기어값: -1=R, 0=N, 1=P, 2=D
+                        rawGearValue = g;
+                        // BYD 기어값: -1=R, 0=N, 1=P, 2=D (추정값 — 실제 차량에서 확인 필요)
                         // 플래그: bit0=P, bit1=R, bit2=N, bit3=D
                         if (g == 1) {
                             gearBlinkBeltFlags |= 0x01; // P
@@ -207,7 +209,7 @@ public final class VehicleDataProvider {
             }
 
             // raw 값이 바뀔 때만 LogBuffer에 기록
-            int rawGear = gearDevice != null ? (gearBlinkBeltFlags & 0x0f) : Integer.MIN_VALUE;
+            int rawGear = rawGearValue;
             int rawTurn = lightDevice != null ? (gearBlinkBeltFlags >> 4) : Integer.MIN_VALUE;
             int rawLight = lightDevice != null ? lightFlags : Integer.MIN_VALUE;
             int rawSpeed = speedDevice != null ? speedKmh : Integer.MIN_VALUE;
@@ -240,7 +242,8 @@ public final class VehicleDataProvider {
                         acceleratorPercent,
                         brakePercent,
                         gearBlinkBeltFlags,
-                        lightFlags));
+                        lightFlags,
+                        rawGearValue));
             }
         } catch (Exception e) {
             Log.w(TAG, "Vehicle telemetry poll failed", e);

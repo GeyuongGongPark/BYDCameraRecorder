@@ -139,7 +139,17 @@ public final class GpsOverlayRenderer {
 
         int activeHeight = hasTelemetry ? OVERLAY_HEIGHT_EXTENDED : OVERLAY_HEIGHT_BASE;
 
-        double rawSpeedKmh = hasGps ? fix.speedKmh : (hasTelemetry ? telemetry.speedKmh : -1);
+        // GPS 속도가 유효한(> 0) 경우만 GPS 우선. 0이면 Vehicle API 속도 사용.
+        double rawSpeedKmh;
+        if (hasGps && fix.speedKmh > 0) {
+            rawSpeedKmh = fix.speedKmh;
+        } else if (hasTelemetry && telemetry.speedKmh > 0) {
+            rawSpeedKmh = telemetry.speedKmh;
+        } else if (hasGps) {
+            rawSpeedKmh = fix.speedKmh;
+        } else {
+            rawSpeedKmh = -1;
+        }
         int speedInt = rawSpeedKmh < 0 ? -1
                 : (int) (useKmh ? rawSpeedKmh : rawSpeedKmh * 0.621371);
         double lat = hasGps ? fix.latitude : 0.0;
@@ -275,6 +285,11 @@ public final class GpsOverlayRenderer {
                     gearRowY,
                     active ? gearActivePaint : gearInactivePaint);
             gearX += GEAR_TEXT_SIZE * 3.2f;
+        }
+        // 기어 매핑 디버그: raw API 값 표시 (매핑 미지원 시 ?:X 형태로 표시)
+        if (!telemetry.isGearKnown() && telemetry.rawGear != Integer.MIN_VALUE) {
+            String rawLabel = "?:" + telemetry.rawGear;
+            overlayCanvas.drawText(rawLabel, gearX, gearRowY, turnActivePaint);
         }
 
         // 방향지시등 행: << (좌) ... >> (우)

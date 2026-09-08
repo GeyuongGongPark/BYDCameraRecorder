@@ -4,7 +4,7 @@ package com.ggpark.byddashcam;
 public final class VehicleTelemetry {
     /** 텔레메트리 미사용 또는 BYD API 미지원 기기에서 반환되는 sentinel 값 */
     public static final VehicleTelemetry UNAVAILABLE =
-            new VehicleTelemetry(0, 0, 0, 0, 0);
+            new VehicleTelemetry(0, 0, 0, 0, 0, Integer.MIN_VALUE);
 
     /** 속도 (km/h, 0-255 클램프) */
     public final int speedKmh;
@@ -23,17 +23,25 @@ public final class VehicleTelemetry {
      */
     public final int lightFlags;
 
+    /**
+     * BYD API의 getCurrentGear() 원시 반환값.
+     * 매핑 디버깅용. Integer.MIN_VALUE = 디바이스 없음.
+     */
+    public final int rawGear;
+
     public VehicleTelemetry(
             int speedKmh,
             int acceleratorPercent,
             int brakePercent,
             int gearBlinkBeltFlags,
-            int lightFlags) {
+            int lightFlags,
+            int rawGear) {
         this.speedKmh = speedKmh;
         this.acceleratorPercent = acceleratorPercent;
         this.brakePercent = brakePercent;
         this.gearBlinkBeltFlags = gearBlinkBeltFlags;
         this.lightFlags = lightFlags;
+        this.rawGear = rawGear;
     }
 
     public boolean isAvailable() {
