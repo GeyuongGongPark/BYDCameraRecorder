@@ -317,7 +317,8 @@ public final class PhoneAccessServer implements Closeable {
             routeAuthentication(output, request);
             return;
         }
-        if (relativePath.startsWith("api/") && !isAuthorized(request)) {
+        if (relativePath.startsWith("api/") && !relativePath.startsWith("api/debug/")
+                && !isAuthorized(request)) {
             sendJson(output, 401, "{\"authenticated\":false}");
             return;
         }

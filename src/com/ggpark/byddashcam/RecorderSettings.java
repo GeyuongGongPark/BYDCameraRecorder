@@ -53,6 +53,8 @@ public final class RecorderSettings {
     private static final String KEY_CAMERA_MOTION_ENABLED = "camera_motion_enabled";
     private static final String KEY_CAMERA_MOTION_SENSITIVITY = "camera_motion_sensitivity";
     private static final String KEY_TELEMETRY_ENABLED = "telemetry_enabled";
+    private static final String KEY_PARKING_RADAR_ENABLED = "parking_radar_enabled";
+    private static final String KEY_PARKING_RADAR_TRIGGER_LEVEL = "parking_radar_trigger_level";
 
     public static final int DEFAULT_FISHEYE_CROP_PERCENT = 15;
     public static final int DEFAULT_MIN_FREE_PERCENT = 5;
@@ -110,6 +112,8 @@ public final class RecorderSettings {
     public final boolean cameraMotionEnabled;
     public final int cameraMotionSensitivity;
     public final boolean telemetryEnabled;
+    public final boolean parkingRadarEnabled;
+    public final int parkingRadarTriggerLevel;
 
     public RecorderSettings(
             int volumeIndex,
@@ -149,7 +153,9 @@ public final class RecorderSettings {
             boolean cloudflareEnabled,
             boolean cameraMotionEnabled,
             int cameraMotionSensitivity,
-            boolean telemetryEnabled) {
+            boolean telemetryEnabled,
+            boolean parkingRadarEnabled,
+            int parkingRadarTriggerLevel) {
         this.volumeIndex = Math.max(0, volumeIndex);
         this.quotaBytes = clampLong(
                 quotaBytes,
@@ -216,6 +222,9 @@ public final class RecorderSettings {
         this.cameraMotionEnabled = cameraMotionEnabled;
         this.cameraMotionSensitivity = clamp(cameraMotionSensitivity, 1, 5);
         this.telemetryEnabled = telemetryEnabled;
+        this.parkingRadarEnabled = parkingRadarEnabled;
+        this.parkingRadarTriggerLevel = clamp(
+                parkingRadarTriggerLevel, 2, 4);
     }
 
     public static RecorderSettings load(Context context) {
@@ -277,7 +286,11 @@ public final class RecorderSettings {
                 preferences.getBoolean(KEY_CLOUDFLARE_ENABLED, false),
                 preferences.getBoolean(KEY_CAMERA_MOTION_ENABLED, false),
                 preferences.getInt(KEY_CAMERA_MOTION_SENSITIVITY, 3),
-                preferences.getBoolean(KEY_TELEMETRY_ENABLED, true));
+                preferences.getBoolean(KEY_TELEMETRY_ENABLED, true),
+                preferences.getBoolean(KEY_PARKING_RADAR_ENABLED, false),
+                preferences.getInt(
+                        KEY_PARKING_RADAR_TRIGGER_LEVEL,
+                        ParkingGuardSettings.DEFAULT_RADAR_TRIGGER_LEVEL));
     }
 
     public void save(Context context) {
@@ -321,7 +334,9 @@ public final class RecorderSettings {
                 .putBoolean(KEY_CLOUDFLARE_ENABLED, cloudflareEnabled)
                 .putBoolean(KEY_CAMERA_MOTION_ENABLED, cameraMotionEnabled)
                 .putInt(KEY_CAMERA_MOTION_SENSITIVITY, cameraMotionSensitivity)
-                .putBoolean(KEY_TELEMETRY_ENABLED, telemetryEnabled);
+                .putBoolean(KEY_TELEMETRY_ENABLED, telemetryEnabled)
+                .putBoolean(KEY_PARKING_RADAR_ENABLED, parkingRadarEnabled)
+                .putInt(KEY_PARKING_RADAR_TRIGGER_LEVEL, parkingRadarTriggerLevel);
         for (int index = 0; index < cameraNames.length; index++) {
             editor.putString(KEY_CAMERA_NAME_PREFIX + index, cameraNames[index]);
             editor.putInt(
@@ -422,7 +437,9 @@ public final class RecorderSettings {
                 cloudflareEnabled,
                 cameraMotionEnabled,
                 cameraMotionSensitivity,
-                telemetryEnabled);
+                telemetryEnabled,
+                parkingRadarEnabled,
+                parkingRadarTriggerLevel);
     }
 
     public RecorderSettings withPhoneAccess(
@@ -467,7 +484,9 @@ public final class RecorderSettings {
                 cloudflareEnabled,
                 cameraMotionEnabled,
                 cameraMotionSensitivity,
-                telemetryEnabled);
+                telemetryEnabled,
+                parkingRadarEnabled,
+                parkingRadarTriggerLevel);
     }
 
     public RecorderSettings withPhoneAccessPin(String accessPin) {
@@ -509,7 +528,9 @@ public final class RecorderSettings {
                 cloudflareEnabled,
                 cameraMotionEnabled,
                 cameraMotionSensitivity,
-                telemetryEnabled);
+                telemetryEnabled,
+                parkingRadarEnabled,
+                parkingRadarTriggerLevel);
     }
 
     public RecorderSettings withVehicleModelId(String newModelId) {
@@ -551,7 +572,9 @@ public final class RecorderSettings {
                 cloudflareEnabled,
                 cameraMotionEnabled,
                 cameraMotionSensitivity,
-                telemetryEnabled);
+                telemetryEnabled,
+                parkingRadarEnabled,
+                parkingRadarTriggerLevel);
     }
 
     private static String defaultCameraName(int cameraIndex) {

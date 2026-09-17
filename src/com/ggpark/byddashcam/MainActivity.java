@@ -4734,7 +4734,9 @@ public final class MainActivity extends Activity
                     cameraMotionSensitivityStepper != null
                             ? cameraMotionSensitivityStepper.getValue()
                             : settings.cameraMotionSensitivity,
-                    settings.telemetryEnabled);
+                    settings.telemetryEnabled,
+                    settings.parkingRadarEnabled,
+                    settings.parkingRadarTriggerLevel);
         } catch (NumberFormatException exception) {
             if (showErrors) {
                 showMessage(getString(R.string.msg_invalid_settings));

@@ -5,10 +5,10 @@ BYD 차량의 내장 AVM 카메라를 활용한 안드로이드 블랙박스 앱
 ## 기능
 
 - **4채널 360° 녹화** — 전/후/좌/우 카메라를 동시에 H.264로 인코딩
-- **텔레메트리 오버레이** — 영상·프리뷰에 속도·기어(P/R/N/D)·방향지시등·액셀/브레이크·전조등 실시간 합성
+- **텔레메트리 오버레이** — 영상·프리뷰에 속도·기어(P/R/N/D)·방향지시등·액셀/브레이크·전조등 실시간 합성. 배터리 잔량·주행 가능 거리·에너지 모드(EV/HEV/FUEL)·드라이브 모드(ECO/SPT)도 표시
 - **GPS 오버레이** — 속도(km/h·mph)·좌표를 영상에 직접 새김, GPX 트랙 저장
-- **주차 감시 모드** — 가속도 센서(충격)·카메라 모션 감지 시 자동 녹화·세그먼트 잠금, 이벤트 전 12초 프리버퍼
-- **속도 기반 자동 전환** — 정지 30초 후 주차 감시 자동 진입, 주행 감지 시 즉시 녹화 복귀
+- **주차 감시 모드** — 가속도 센서(충격)·카메라 모션 감지·BYD 레이더 8개 센서(근접 감지) 3중 방식으로 위협 감지, 이벤트 전 12초 프리버퍼
+- **시동 기반 자동 전환** — 시동 ON(PowerLevel≥2) 감지 즉시 녹화 복귀, 시동 OFF(ON→ACC) 감지 즉시 주차 감시 전환 (30초 대기 없음). 속도 0 + 정지 30초 후 주차 감시 진입도 지원
 - **스마트폰 원격 접속** — 차량 Wi-Fi로 연결 후 브라우저 또는 Flutter 앱에서 영상 확인·다운로드
 - **외부 연동** — Telegram 충격/모션 알림, MQTT(Home Assistant Discovery), Cloudflare 터널 외부 접근
 - **세그먼트 자동 관리** — 용량 초과 시 오래된 세그먼트 자동 삭제 (잠금 영상 보호)
@@ -99,7 +99,7 @@ src/                          Java 소스
   GpsDataProvider               GPS 데이터 수집 (LocationManager 래퍼)
   GpsOverlayRenderer            GPS·텔레메트리 오버레이 합성 (NV21·Bitmap 양쪽 지원)
   TelemetryOverlayView          프리뷰 화면 위 텔레메트리 오버레이 (custom View)
-  VehicleDataProvider           BYD 차량 API 폴링 (속도·기어·방향지시등·조명)
+  VehicleDataProvider           BYD 차량 API 폴링 (속도·기어·방향지시등·조명·배터리·시동·레이더)
   VehicleTelemetry              텔레메트리 데이터 스냅샷 (불변)
   LogBuffer                     최근 500개 텔레메트리 로그 순환 저장
   ImpactDetector                충격 감지 (가속도 센서)
@@ -119,16 +119,35 @@ build.sh                      빌드 스크립트
 
 ## 텔레메트리 API 접근 방식
 
-BYD 비공개 차량 API에 Java Reflection으로 접근합니다.
+BYD 비공개 차량 API에 Java Reflection으로 접근합니다. 100ms 빠른 폴(속도·기어·조명)과 5s 느린 폴(배터리·시동·에너지)로 이중화합니다.
 
-| API 클래스 | 메서드 | 용도 |
-|-----------|-------|------|
-| `BYDAutoSpeedDevice` | `getCurrentSpeed()` | 속도 (km/h) |
-| `BYDAutoSpeedDevice` | `getAccelerateDeepness()` | 가속 페달 (0~100%) |
-| `BYDAutoSpeedDevice` | `getBrakeDeepness()` | 브레이크 페달 (0~100%) |
-| `BYDAutoGearboxDevice` | `getGearboxAutoModeType()` | 기어 위치 (P/R/N/D) |
-| `BYDAutoLightDevice` | `getTurnLightFlashState()` | 방향지시등 상태 |
-| `BYDAutoLightDevice` | `getLightStatus(int type)` | 조명 상태 (type=2:하향등, type=3:상향등) |
+| API 클래스 | 메서드 | 용도 | 폴 주기 |
+|-----------|-------|------|--------|
+| `BYDAutoSpeedDevice` | `getCurrentSpeed()` | 속도 (km/h) | 100ms |
+| `BYDAutoSpeedDevice` | `getAccelerateDeepness()` | 가속 페달 (0~100%) | 100ms |
+| `BYDAutoSpeedDevice` | `getBrakeDeepness()` | 브레이크 페달 (0~100%) | 100ms |
+| `BYDAutoGearboxDevice` | `getGearboxAutoModeType()` | 기어 위치 (P/R/N/D) | 100ms |
+| `BYDAutoLightDevice` | `getTurnLightFlashState()` | 방향지시등 상태 | 100ms |
+| `BYDAutoLightDevice` | `getLightStatus(int type)` | 조명 상태 (type=2:하향등, type=3:상향등) | 100ms |
+| `BYDAutoBodyworkDevice` | `getPowerLevel()` | 시동 상태 (0=OFF,1=ACC,2=ON,3=OK,4=FAKE_OK,255=INVALID) | 5s |
+| `BYDAutoStatisticDevice` | `getBatteryPercent()` | 배터리 잔량 (0~100%) | 5s |
+| `BYDAutoStatisticDevice` | `getDrivingRange()` | 전기 주행 가능 거리 (km) | 5s |
+| `BYDAutoEnergyDevice` | `getEnergyMode()` | 에너지 모드 (0=STOP,1=EV,2=FORCE_EV,3=HEV,4=FUEL,5=KEEP) | 5s |
+| `BYDAutoEnergyDevice` | `getOperationMode()` | 드라이브 모드 (1=ECO,2=SPT) | 5s |
+| `BYDAutoRadarDevice` | `getAllRadarProbeStates()` | 레이더 8개 센서 상태 (0=이상,1=안전,2=녹색,3=노랑,4=빨강) | 200ms |
+
+### 레이더 센서 배치
+
+| 인덱스 | 위치 |
+|-------|------|
+| 0 | LEFT_FRONT (좌전) |
+| 1 | RIGHT_FRONT (우전) |
+| 2 | LEFT_REAR (좌후) |
+| 3 | RIGHT_REAR (우후) |
+| 4 | LEFT (좌측) |
+| 5 | RIGHT (우측) |
+| 6 | FRONT_LEFT_MID (전방 좌중) |
+| 7 | FRONT_RIGHT_MID (전방 우중) |
 
 BYD API 미지원 기기에서는 UNAVAILABLE 텔레메트리로 graceful degradation 합니다.
 

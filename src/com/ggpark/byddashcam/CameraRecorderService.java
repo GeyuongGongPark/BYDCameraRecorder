@@ -65,6 +65,8 @@ public final class CameraRecorderService extends Service
     }
 
     public static final String EXTRA_STARTUP_REASON = "startup_reason";
+    /** 시동 ON 브로드캐스트를 받은 IgnitionReceiver가 서비스에 전달하는 내부 액션 */
+    public static final String ACTION_IGNITION_ON = "com.ggpark.byddashcam.action.IGNITION_ON";
     private static final String CHANNEL_ID = "byd_camera_recording";
     private static final String PARKING_CHANNEL_ID = "byd_parking_guard";
     private static final int NOTIFICATION_ID = 48;
@@ -196,6 +198,8 @@ public final class CameraRecorderService extends Service
     private volatile double lastSpeedKmh = -1.0;
     private volatile double lastGpsSpeedKmh = -1.0;
     private volatile double lastTelemetrySpeedKmh = -1.0;
+    private volatile VehicleTelemetry lastTelemetry = null;
+    private volatile int lastKnownPowerLevel = -1;
     private final Runnable autoParkRunnable = new Runnable() {
         @Override public void run() { tryAutoPark(); }
     };
@@ -1070,6 +1074,19 @@ public final class CameraRecorderService extends Service
         if (lastSpeedKmh > AUTO_PARK_SPEED_THRESHOLD_KMH) {
             return; // 속도가 다시 올라간 경우 취소
         }
+        // 시동이 켜진 상태(시동 ON)이면 정차 중에도 주차 모드 전환 차단
+        VehicleTelemetry t = lastTelemetry;
+        if (t != null && t.isAvailable()) {
+            if (t.isIgnitionOn()) {
+                Log.d(TAG, "Auto-park suppressed: ignition ON (powerLevel=" + t.powerLevel + ")");
+                return;
+            }
+            // 주행/후진 기어라면 추가 안전장치
+            if (t.isDriving()) {
+                Log.d(TAG, "Auto-park suppressed: driving gear active");
+                return;
+            }
+        }
         Log.i(TAG, "Auto-switching to parking mode (speed=" + lastSpeedKmh + " km/h)");
         enterParkingMode();
     }
@@ -1093,10 +1110,38 @@ public final class CameraRecorderService extends Service
             renderer.updateTelemetry(telemetry);
         }
         segmentRecorder.updateTelemetry(telemetry);
-        // GPS/텔레메트리 속도 중 더 큰 값으로 주차 자동전환 판단 (어느 한쪽이라도 주행 중이면 주차 진입 방지)
         if (telemetry != null && telemetry.isAvailable()) {
+            lastTelemetry = telemetry;
             lastTelemetrySpeedKmh = telemetry.speedKmh;
             onSpeedUpdated(Math.max(lastGpsSpeedKmh, lastTelemetrySpeedKmh));
+
+            final int newPowerLevel = telemetry.powerLevel;
+            final int prevPowerLevel = lastKnownPowerLevel;
+            if (newPowerLevel >= 0) {
+                lastKnownPowerLevel = newPowerLevel;
+            }
+
+            if (newPowerLevel >= 2 && isParkingGuardActive()) {
+                // 시동 ON → 주차 감시 즉시 해제 후 녹화 시작 (메인 스레드로 위임)
+                mainHandler.post(new Runnable() {
+                    @Override public void run() {
+                        if (!isParkingGuardActive()) return;
+                        Log.i(TAG, "Ignition ON (powerLevel=" + newPowerLevel + ") — exiting parking mode");
+                        exitParkingMode();
+                        startRecording(RecorderSettings.load(CameraRecorderService.this));
+                    }
+                });
+            } else if (prevPowerLevel >= 2 && prevPowerLevel < 255 && newPowerLevel < 2 && mode == Mode.RECORDING) {
+                // 시동 OFF (ON/OK→ACC/OFF 전환) → 30초 대기 없이 즉시 주차 감시 진입 (메인 스레드로 위임)
+                mainHandler.removeCallbacks(autoParkRunnable);
+                mainHandler.post(new Runnable() {
+                    @Override public void run() {
+                        if (mode != Mode.RECORDING) return;
+                        Log.i(TAG, "Ignition OFF (powerLevel " + prevPowerLevel + "→" + newPowerLevel + ") — entering parking mode immediately");
+                        enterParkingMode();
+                    }
+                });
+            }
         }
         UiListener ui = uiListener;
         if (ui != null) {
@@ -1146,7 +1191,9 @@ public final class CameraRecorderService extends Service
                 settings.parkingRecordingSeconds,
                 settings.parkingAutoLock,
                 settings.cameraMotionEnabled,
-                settings.cameraMotionSensitivity);
+                settings.cameraMotionSensitivity,
+                settings.parkingRadarEnabled,
+                settings.parkingRadarTriggerLevel);
         parkingGuardController = new ParkingGuardController(
                 this,
                 new ParkingGuardController.Callback() {
@@ -1157,6 +1204,10 @@ public final class CameraRecorderService extends Service
                     @Override
                     public void onMotionRecordingStarted() {
                         handleMotionRecordingStarted();
+                    }
+                    @Override
+                    public void onRadarRecordingStarted(int area, int level) {
+                        handleRadarRecordingStarted(area, level);
                     }
                     @Override
                     public void onImpactRecordingStopped() {
@@ -1293,6 +1344,56 @@ public final class CameraRecorderService extends Service
             mqttPublisher.publish(prefix + "/state", "parking_recording");
         }
         publishState("모션 감지 - 주차 녹화 시작");
+    }
+
+    private synchronized void handleRadarRecordingStarted(int area, int level) {
+        if (mode != Mode.PARKING_STANDBY) {
+            return;
+        }
+        Log.i(TAG, "Parking radar detected: area=" + area + " level=" + level + " - starting recording");
+        mode = Mode.PARKING_RECORDING;
+        RecorderSettings settings = RecorderSettings.load(this);
+        segmentRecorder.setEventMetadata("radar", 0f);
+        if (segmentRecorder.isStarted()) {
+            List<File> preBufferDirs = segmentRecorder.getAndClearPreBufferDirs();
+            if (settings.parkingAutoLock) {
+                for (File dir : preBufferDirs) {
+                    try {
+                        storageRepository.setLocked(settings, dir, true);
+                        Log.i(TAG, "Pre-buffer dir locked (radar): " + dir.getName());
+                    } catch (IOException e) {
+                        Log.w(TAG, "Failed to lock pre-buffer dir: " + dir.getName(), e);
+                    }
+                }
+                segmentRecorder.setAutoLockForNextSegment();
+            }
+            try {
+                segmentRecorder.rotateNow(false);
+            } catch (IOException exception) {
+                Log.e(TAG, "Radar recording rotate failed", exception);
+            }
+        } else {
+            RecorderSettings parkingRecordingSettings =
+                    settings.withContinuousRecordingEnabled(false);
+            lastRecordedFrameNanos = 0L;
+            pendingRecordingSettings = parkingRecordingSettings;
+            scheduleRecordingStartupTimeout();
+            if (settings.parkingAutoLock) {
+                segmentRecorder.setAutoLockForNextSegment();
+            }
+        }
+        enterForeground();
+        if (telegramNotifier != null) {
+            telegramNotifier.send("🅿️ 레이더 근접 감지 (구역" + area + "): 주차 녹화 시작");
+        }
+        if (mqttPublisher != null) {
+            RecorderSettings s = RecorderSettings.load(this);
+            String prefix = s.mqttTopicPrefix;
+            mqttPublisher.publish(prefix + "/parking/radar",
+                    "{\"area\":" + area + ",\"level\":" + level + "}");
+            mqttPublisher.publish(prefix + "/state", "parking_recording");
+        }
+        publishState("레이더 감지 - 주차 녹화 시작 (구역" + area + ")");
     }
 
     private synchronized void handleImpactRecordingStopped() {
@@ -1492,7 +1593,9 @@ public final class CameraRecorderService extends Service
                 PhoneJson.booleanValue(json, "cloudflareEnabled", current.cloudflareEnabled),
                 current.cameraMotionEnabled,
                 current.cameraMotionSensitivity,
-                current.telemetryEnabled);
+                current.telemetryEnabled,
+                current.parkingRadarEnabled,
+                current.parkingRadarTriggerLevel);
         updated.save(this);
         applyRecorderSettings(updated);
         publishSettingsChanged();

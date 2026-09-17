@@ -25,6 +25,8 @@ public final class TelemetryOverlayView extends View {
     private static final int GEAR_TEXT_SIZE_DP = 14;
     private static final int BG_ALPHA = 140;
     private static final long BLINK_INTERVAL_MS = 500L;
+    private static final String[] GEAR_TEXTS = {"[P]", "[R]", "[N]", "[D]"};
+    private static final int[] GEAR_BITS = {0x01, 0x02, 0x04, 0x08};
 
     private final Paint speedPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint infoPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -46,6 +48,20 @@ public final class TelemetryOverlayView extends View {
         }
     };
 
+    // density 기반 크기 — 생성자에서 한 번만 계산
+    private float density;
+    private float overlayWidth;
+    private float overlayPadding;
+    private float speedTextSize;
+    private float infoTextSize;
+    private float gearTextSize;
+
+    // 문자열 재사용
+    private final StringBuilder sb = new StringBuilder(32);
+
+    // GPS stale 전용 Paint (infoPaint 색 임시 변경 방지)
+    private final Paint gpsStalePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
     private volatile VehicleTelemetry telemetry = VehicleTelemetry.UNAVAILABLE;
     private volatile GpsFix gpsFix = GpsFix.UNAVAILABLE;
     private boolean enabled = true;
@@ -55,42 +71,48 @@ public final class TelemetryOverlayView extends View {
         super(context);
         setWillNotDraw(false);
 
-        float density = context.getResources().getDisplayMetrics().density;
-        float speedSp = SPEED_TEXT_SIZE_DP * density;
-        float infoSp = INFO_TEXT_SIZE_DP * density;
-        float gearSp = GEAR_TEXT_SIZE_DP * density;
+        density = context.getResources().getDisplayMetrics().density;
+        overlayWidth  = OVERLAY_WIDTH_DP   * density;
+        overlayPadding = OVERLAY_PADDING_DP * density;
+        speedTextSize  = SPEED_TEXT_SIZE_DP * density;
+        infoTextSize   = INFO_TEXT_SIZE_DP  * density;
+        gearTextSize   = GEAR_TEXT_SIZE_DP  * density;
 
         speedPaint.setColor(Color.WHITE);
         speedPaint.setTypeface(Typeface.MONOSPACE);
-        speedPaint.setTextSize(speedSp);
+        speedPaint.setTextSize(speedTextSize);
         speedPaint.setFakeBoldText(true);
 
         shadowPaint.setColor(Color.BLACK);
         shadowPaint.setTypeface(Typeface.MONOSPACE);
-        shadowPaint.setTextSize(speedSp);
+        shadowPaint.setTextSize(speedTextSize);
         shadowPaint.setFakeBoldText(true);
 
         infoPaint.setColor(Color.WHITE);
         infoPaint.setTypeface(Typeface.MONOSPACE);
-        infoPaint.setTextSize(infoSp);
+        infoPaint.setTextSize(infoTextSize);
+
+        gpsStalePaint.setColor(Color.YELLOW);
+        gpsStalePaint.setTypeface(Typeface.MONOSPACE);
+        gpsStalePaint.setTextSize(infoTextSize);
 
         gearActivePaint.setColor(Color.WHITE);
         gearActivePaint.setTypeface(Typeface.MONOSPACE);
-        gearActivePaint.setTextSize(gearSp);
+        gearActivePaint.setTextSize(gearTextSize);
         gearActivePaint.setFakeBoldText(true);
 
         gearInactivePaint.setColor(Color.argb(120, 180, 180, 180));
         gearInactivePaint.setTypeface(Typeface.MONOSPACE);
-        gearInactivePaint.setTextSize(gearSp);
+        gearInactivePaint.setTextSize(gearTextSize);
 
         turnActivePaint.setColor(Color.rgb(255, 200, 0));
         turnActivePaint.setTypeface(Typeface.MONOSPACE);
-        turnActivePaint.setTextSize(gearSp);
+        turnActivePaint.setTextSize(gearTextSize);
         turnActivePaint.setFakeBoldText(true);
 
         turnInactivePaint.setColor(Color.argb(80, 180, 140, 0));
         turnInactivePaint.setTypeface(Typeface.MONOSPACE);
-        turnInactivePaint.setTextSize(gearSp);
+        turnInactivePaint.setTextSize(gearTextSize);
 
         bgPaint.setColor(Color.argb(BG_ALPHA, 0, 0, 0));
     }
@@ -131,21 +153,20 @@ public final class TelemetryOverlayView extends View {
     protected void onDraw(Canvas canvas) {
         if (!enabled) return;
 
-        float density = getResources().getDisplayMetrics().density;
-        float overlayWidth = OVERLAY_WIDTH_DP * density;
-        float overlayPadding = OVERLAY_PADDING_DP * density;
-        float speedTextSize = SPEED_TEXT_SIZE_DP * density;
-        float infoTextSize = INFO_TEXT_SIZE_DP * density;
-        float gearTextSize = GEAR_TEXT_SIZE_DP * density;
-
         VehicleTelemetry t = telemetry;
         GpsFix fix = gpsFix;
         boolean hasGps = fix != null && fix.isAvailable();
         boolean hasTelemetry = t != null && t.isAvailable();
 
+        boolean hasBattery = hasTelemetry && t.batteryPercent >= 0;
+        boolean hasEnergyMode = hasTelemetry && t.energyMode >= 0;
+        int extraRows = 0;
+        if (hasTelemetry) extraRows += 3; // 기어, 방향지시등, 페달/조명
+        if (hasBattery || hasEnergyMode) extraRows += 1;
+
         float overlayBaseHeight = speedTextSize + infoTextSize + overlayPadding * 2;
         float overlayExtHeight = hasTelemetry
-                ? overlayBaseHeight + gearTextSize * 3 + overlayPadding * 2
+                ? overlayBaseHeight + gearTextSize * extraRows + overlayPadding * 2
                 : overlayBaseHeight;
 
         float viewWidth = getWidth();
@@ -173,9 +194,15 @@ public final class TelemetryOverlayView extends View {
         int speedInt = rawSpeedKmh < 0 ? -1
                 : (int) (useKmh ? rawSpeedKmh : rawSpeedKmh * 0.621371);
         String unit = useKmh ? "km/h" : "mph";
-        String speedText = speedInt < 0
-                ? String.format(Locale.US, "--- %s", unit)
-                : String.format(Locale.US, "%3d %s", speedInt, unit);
+        sb.setLength(0);
+        if (speedInt < 0) {
+            sb.append("--- ").append(unit);
+        } else {
+            if (speedInt < 100) sb.append(' ');
+            if (speedInt < 10) sb.append(' ');
+            sb.append(speedInt).append(' ').append(unit);
+        }
+        String speedText = sb.toString();
 
         float textX = offsetX + overlayPadding;
         float textY = offsetY + speedTextSize + overlayPadding;
@@ -185,23 +212,19 @@ public final class TelemetryOverlayView extends View {
 
         // GPS stale 표시
         if (hasGps && !fix.fresh) {
-            infoPaint.setColor(Color.YELLOW);
             canvas.drawText("GPS?",
-                    offsetX + overlayWidth - overlayPadding - infoPaint.measureText("GPS?"),
-                    textY, infoPaint);
-            infoPaint.setColor(Color.WHITE);
+                    offsetX + overlayWidth - overlayPadding - gpsStalePaint.measureText("GPS?"),
+                    textY, gpsStalePaint);
         }
 
         if (!hasTelemetry) return;
 
         // 기어 행
         float gearRowY = offsetY + overlayBaseHeight + gearTextSize;
-        String[] gears = {"P", "R", "N", "D"};
-        int[] gearBits = {0x01, 0x02, 0x04, 0x08};
         float gearX = offsetX + overlayPadding;
-        for (int i = 0; i < gears.length; i++) {
-            boolean active = (t.gearBlinkBeltFlags & gearBits[i]) != 0;
-            canvas.drawText("[" + gears[i] + "]", gearX, gearRowY,
+        for (int i = 0; i < GEAR_TEXTS.length; i++) {
+            boolean active = (t.gearBlinkBeltFlags & GEAR_BITS[i]) != 0;
+            canvas.drawText(GEAR_TEXTS[i], gearX, gearRowY,
                     active ? gearActivePaint : gearInactivePaint);
             gearX += gearTextSize * 3.2f;
         }
@@ -213,30 +236,55 @@ public final class TelemetryOverlayView extends View {
 
         // 방향지시등 행
         float turnRowY = gearRowY + gearTextSize + overlayPadding / 2;
-        boolean leftActive = t.isTurnLeftActive();
-        boolean rightActive = t.isTurnRightActive();
-
         canvas.drawText("<<",
                 offsetX + overlayPadding,
                 turnRowY,
-                leftActive && blinkOn ? turnActivePaint : turnInactivePaint);
-
+                t.isTurnLeftActive() && blinkOn ? turnActivePaint : turnInactivePaint);
         canvas.drawText(">>",
                 offsetX + overlayWidth - overlayPadding - gearTextSize * 2.5f,
                 turnRowY,
-                rightActive && blinkOn ? turnActivePaint : turnInactivePaint);
+                t.isTurnRightActive() && blinkOn ? turnActivePaint : turnInactivePaint);
 
         // 액셀/브레이크/전조등 행
         float pedalRowY = turnRowY + gearTextSize + overlayPadding / 2;
-        String pedalText = String.format(Locale.US,
-                "A:%2d%% B:%2d%%", t.acceleratorPercent, t.brakePercent);
-        canvas.drawText(pedalText, offsetX + overlayPadding, pedalRowY, infoPaint);
+        sb.setLength(0);
+        sb.append("A:");
+        if (t.acceleratorPercent < 10) sb.append(' ');
+        sb.append(t.acceleratorPercent).append("% B:");
+        if (t.brakePercent < 10) sb.append(' ');
+        sb.append(t.brakePercent).append('%');
+        canvas.drawText(sb.toString(), offsetX + overlayPadding, pedalRowY, infoPaint);
 
         String lightText = buildLightText(t.lightFlags);
         if (!lightText.isEmpty()) {
-            float lightX = offsetX + overlayWidth - overlayPadding
-                    - infoPaint.measureText(lightText);
-            canvas.drawText(lightText, lightX, pedalRowY, turnActivePaint);
+            canvas.drawText(lightText,
+                    offsetX + overlayWidth - overlayPadding - infoPaint.measureText(lightText),
+                    pedalRowY, turnActivePaint);
+        }
+
+        // 배터리 잔량 + 주행 가능 거리 / 에너지·드라이브 모드 행
+        if (hasBattery || hasEnergyMode) {
+            float infoRowY = pedalRowY + gearTextSize + overlayPadding / 2;
+            if (hasBattery) {
+                sb.setLength(0);
+                sb.append("BAT:");
+                if (t.batteryPercent < 100) sb.append(' ');
+                if (t.batteryPercent < 10) sb.append(' ');
+                sb.append(t.batteryPercent).append('%');
+                if (t.drivingRangeKm >= 0) {
+                    sb.append(' ').append(t.drivingRangeKm).append("km");
+                }
+                canvas.drawText(sb.toString(), offsetX + overlayPadding, infoRowY, infoPaint);
+            }
+            if (hasEnergyMode) {
+                String modeText = buildEnergyModeText(t.energyMode, t.operationMode);
+                if (!modeText.isEmpty()) {
+                    canvas.drawText(modeText,
+                            offsetX + overlayWidth - overlayPadding
+                                    - infoPaint.measureText(modeText),
+                            infoRowY, turnActivePaint);
+                }
+            }
         }
     }
 
@@ -246,5 +294,22 @@ public final class TelemetryOverlayView extends View {
         if ((flags & 0x08) != 0) return "[FG]";
         if ((flags & 0x01) != 0) return "[PL]";
         return "";
+    }
+
+    private static String buildEnergyModeText(int energyMode, int operationMode) {
+        String energy;
+        switch (energyMode) {
+            case 1: energy = "EV"; break;
+            case 2: energy = "EV!"; break;
+            case 3: energy = "HEV"; break;
+            case 4: energy = "FUEL"; break;
+            case 5: energy = "KEEP"; break;
+            default: energy = "";
+        }
+        String op = operationMode == 1 ? "ECO" : operationMode == 2 ? "SPT" : "";
+        if (energy.isEmpty() && op.isEmpty()) return "";
+        if (energy.isEmpty()) return op;
+        if (op.isEmpty()) return energy;
+        return energy + " " + op;
     }
 }
