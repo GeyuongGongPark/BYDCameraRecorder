@@ -64,6 +64,9 @@ public final class VehicleDataProvider {
     private boolean gearInvokeErrorLogged = false;
     private boolean gearNullLogged = false;
 
+    // 첫 번째 폴에서는 무조건 콜백 발생 (이전 값과 동일해도)
+    private boolean isFirstPoll = true;
+
     // 이전 값 — 변경 시에만 LogBuffer 기록 및 리스너 콜백
     private int prevRawSpeed = Integer.MIN_VALUE;
     private int prevRawGear = Integer.MIN_VALUE;
@@ -415,7 +418,8 @@ public final class VehicleDataProvider {
             }
 
             Listener l = listener;
-            if (l != null && (fastChanged || slowChanged)) {
+            if (l != null && (isFirstPoll || fastChanged || slowChanged)) {
+                isFirstPoll = false;
                 l.onTelemetryUpdated(new VehicleTelemetry(
                         speedKmh,
                         acceleratorPercent,
