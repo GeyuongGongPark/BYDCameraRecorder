@@ -1,18 +1,32 @@
 package com.ggpark.byddashcam;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.util.Log;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import dalvik.system.InMemoryDexClassLoader;
 
 /**
  * BYD 비공개 API에 Java Reflection으로 접근해 차량 텔레메트리를 폴링합니다.
  * Fast poll(100ms): 속도/기어/조명 — 빠르게 변하는 값
  * Slow poll(5s):   배터리/에너지 모드 — 천천히 변하는 값
- * BYD API 미지원 기기에서도 graceful degradation: UNAVAILABLE 텔레메트리를 콜백합니다.
+ *
+ * BeetleLauncher 분석으로 확인한 방식:
+ *   com.byd.data.collect 앱의 DEX를 InMemoryDexClassLoader로 메모리 로드 후
+ *   해당 ClassLoader로 BYD 클래스에 접근 — Permission 문제 우회.
  */
 public final class VehicleDataProvider {
     public interface Listener {
@@ -20,6 +34,7 @@ public final class VehicleDataProvider {
     }
 
     private static final String TAG = "BYDCamera";
+    private static final String OEM_PKG = "com.byd.data.collect";
     private static final long FAST_POLL_MS = 100L;
     private static final long SLOW_POLL_MS = 5000L;
 
@@ -33,7 +48,8 @@ public final class VehicleDataProvider {
     private Method methodGetGearboxAutoModeType;
 
     private Object lightDevice;
-    private Method methodGetLightStatus; // getLightStatus(int type)
+    private Method methodGetTurnLightFlashState; // 주 방향지시등 소스 (BeetleLauncher 확인)
+    private Method methodGetLightStatus;         // getLightStatus(int type) — 조명/방향지시등 fallback
 
     // Slow poll 디바이스
     private Object statisticDevice;
@@ -64,7 +80,7 @@ public final class VehicleDataProvider {
     private boolean gearInvokeErrorLogged = false;
     private boolean gearNullLogged = false;
 
-    // 첫 번째 폴에서는 무조건 콜백 발생 (이전 값과 동일해도)
+    // 첫 번째 폴에서는 무조건 콜백 발생
     private boolean isFirstPoll = true;
 
     // 이전 값 — 변경 시에만 LogBuffer 기록 및 리스너 콜백
@@ -89,8 +105,7 @@ public final class VehicleDataProvider {
     }
 
     public void start(Context context) {
-        Context vehicleContext = new VehicleContextWrapper(context);
-        initDevices(vehicleContext);
+        initDevices(context);
         fastExecutor = Executors.newSingleThreadScheduledExecutor();
         fastExecutor.scheduleAtFixedRate(
                 new Runnable() {
@@ -130,13 +145,123 @@ public final class VehicleDataProvider {
         return anyDeviceAvailable;
     }
 
+    // -----------------------------------------------------------------------
+    // DEX ClassLoader — com.byd.data.collect APK에서 메모리 로드
+    // -----------------------------------------------------------------------
+
+    private ClassLoader bydClassLoader = null;
+
+    private void initBydClassLoader(Context context) {
+        // 1. 시스템 클래스패스에 BYD 클래스가 있는지 먼저 확인
+        try {
+            Class.forName("android.hardware.bydauto.speed.BYDAutoSpeedDevice");
+            bydClassLoader = context.getClassLoader();
+            Log.i(TAG, "BYD SDK: 시스템 클래스패스에서 발견");
+            return;
+        } catch (ClassNotFoundException ignored) {
+        }
+
+        // 2. com.byd.data.collect APK DEX를 InMemoryDexClassLoader로 로드
+        try {
+            ApplicationInfo ai = context.getPackageManager()
+                    .getApplicationInfo(OEM_PKG, 0);
+            List<String> apkPaths = new ArrayList<>();
+            if (ai.sourceDir != null) apkPaths.add(ai.sourceDir);
+            if (ai.splitSourceDirs != null) {
+                for (String s : ai.splitSourceDirs) apkPaths.add(s);
+            }
+            if (apkPaths.isEmpty()) {
+                Log.w(TAG, "BYD SDK: " + OEM_PKG + " APK 경로 없음");
+                return;
+            }
+
+            List<ByteBuffer> dexBuffers = new ArrayList<>();
+            for (String apkPath : apkPaths) {
+                extractDexBuffers(apkPath, dexBuffers);
+            }
+            if (dexBuffers.isEmpty()) {
+                Log.w(TAG, "BYD SDK: DEX 없음 — " + apkPaths);
+                return;
+            }
+
+            ByteBuffer[] arr = dexBuffers.toArray(new ByteBuffer[0]);
+            InMemoryDexClassLoader loader =
+                    new InMemoryDexClassLoader(arr, context.getClassLoader());
+            // 프로브 클래스 로드 확인
+            Class.forName("android.hardware.bydauto.speed.BYDAutoSpeedDevice", false, loader);
+            bydClassLoader = loader;
+            Log.i(TAG, "BYD SDK: " + OEM_PKG + " DEX 로드 완료 (" + dexBuffers.size() + " dex)");
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "BYD SDK: " + OEM_PKG + " 미설치 (에뮬레이터?)");
+        } catch (Exception e) {
+            Log.w(TAG, "BYD SDK: DEX 로드 실패 — " + e.getMessage());
+        }
+    }
+
+    private static void extractDexBuffers(String apkPath, List<ByteBuffer> out) {
+        try {
+            ZipFile zip = new ZipFile(apkPath);
+            try {
+                Enumeration<? extends ZipEntry> entries = zip.entries();
+                while (entries.hasMoreElements()) {
+                    ZipEntry entry = entries.nextElement();
+                    String name = entry.getName();
+                    if (name.matches("classes\\d*\\.dex")) {
+                        InputStream is = zip.getInputStream(entry);
+                        out.add(ByteBuffer.wrap(readAllBytes(is)));
+                        is.close();
+                    }
+                }
+            } finally {
+                zip.close();
+            }
+        } catch (IOException e) {
+            Log.w(TAG, "BYD SDK: DEX 추출 실패 " + apkPath + " — " + e.getMessage());
+        }
+    }
+
+    private static byte[] readAllBytes(InputStream is) throws IOException {
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[65536];
+        int n;
+        while ((n = is.read(buf)) != -1) {
+            baos.write(buf, 0, n);
+        }
+        return baos.toByteArray();
+    }
+
+    private Class<?> loadBydClass(String fqn) throws ClassNotFoundException {
+        if (bydClassLoader != null) {
+            return Class.forName(fqn, true, bydClassLoader);
+        }
+        return Class.forName(fqn);
+    }
+
+    /**
+     * getInstance(Context) 또는 getsInstance(Context) 중 하나를 호출합니다.
+     * BeetleLauncher는 두 팩토리 메서드를 모두 fallback으로 시도합니다.
+     */
+    private Object getDeviceInstance(Class<?> cls, Context context) throws Exception {
+        Method factory;
+        try {
+            factory = cls.getMethod("getInstance", Context.class);
+        } catch (NoSuchMethodException e) {
+            factory = cls.getMethod("getsInstance", Context.class);
+        }
+        return factory.invoke(null, context);
+    }
+
+    // -----------------------------------------------------------------------
+    // 디바이스 초기화
+    // -----------------------------------------------------------------------
+
     private void initDevices(Context context) {
+        initBydClassLoader(context);
+
         // 속도/가속/브레이크 디바이스
         try {
-            Class<?> cls = Class.forName(
-                    "android.hardware.bydauto.speed.BYDAutoSpeedDevice");
-            Method getInstance = cls.getMethod("getInstance", Context.class);
-            speedDevice = getInstance.invoke(null, context);
+            Class<?> cls = loadBydClass("android.hardware.bydauto.speed.BYDAutoSpeedDevice");
+            speedDevice = getDeviceInstance(cls, context);
             methodGetCurrentSpeed = cls.getMethod("getCurrentSpeed");
             methodGetAccelerateDeepness = cls.getMethod("getAccelerateDeepness");
             methodGetBrakeDeepness = cls.getMethod("getBrakeDeepness");
@@ -148,10 +273,8 @@ public final class VehicleDataProvider {
 
         // 기어박스 디바이스
         try {
-            Class<?> cls = Class.forName(
-                    "android.hardware.bydauto.gearbox.BYDAutoGearboxDevice");
-            Method getInstance = cls.getMethod("getInstance", Context.class);
-            gearDevice = getInstance.invoke(null, context);
+            Class<?> cls = loadBydClass("android.hardware.bydauto.gearbox.BYDAutoGearboxDevice");
+            gearDevice = getDeviceInstance(cls, context);
             methodGetGearboxAutoModeType = cls.getMethod("getGearboxAutoModeType");
             anyDeviceAvailable = true;
             Log.i(TAG, "BYD gear device initialized");
@@ -161,11 +284,18 @@ public final class VehicleDataProvider {
 
         // 조명 디바이스
         try {
-            Class<?> cls = Class.forName(
-                    "android.hardware.bydauto.light.BYDAutoLightDevice");
-            Method getInstance = cls.getMethod("getInstance", Context.class);
-            lightDevice = getInstance.invoke(null, context);
-            methodGetLightStatus = cls.getMethod("getLightStatus", Integer.TYPE);
+            Class<?> cls = loadBydClass("android.hardware.bydauto.light.BYDAutoLightDevice");
+            lightDevice = getDeviceInstance(cls, context);
+            try {
+                methodGetTurnLightFlashState = cls.getMethod("getTurnLightFlashState");
+            } catch (NoSuchMethodException e) {
+                Log.w(TAG, "getTurnLightFlashState 없음 — getLightStatus fallback 사용");
+            }
+            try {
+                methodGetLightStatus = cls.getMethod("getLightStatus", Integer.TYPE);
+            } catch (NoSuchMethodException e) {
+                Log.w(TAG, "getLightStatus(int) 없음");
+            }
             anyDeviceAvailable = true;
             Log.i(TAG, "BYD light device initialized");
         } catch (Exception e) {
@@ -174,10 +304,9 @@ public final class VehicleDataProvider {
 
         // 주행 통계 디바이스 (배터리 잔량, 주행 가능 거리)
         try {
-            Class<?> cls = Class.forName(
+            Class<?> cls = loadBydClass(
                     "android.hardware.bydauto.statistic.BYDAutoStatisticDevice");
-            Method getInstance = cls.getMethod("getInstance", Context.class);
-            statisticDevice = getInstance.invoke(null, context);
+            statisticDevice = getDeviceInstance(cls, context);
             methodGetElecPercentageValue = cls.getMethod("getElecPercentageValue");
             methodGetElecDrivingRangeValue = cls.getMethod("getElecDrivingRangeValue");
             anyDeviceAvailable = true;
@@ -188,10 +317,8 @@ public final class VehicleDataProvider {
 
         // 에너지 모드 디바이스
         try {
-            Class<?> cls = Class.forName(
-                    "android.hardware.bydauto.energy.BYDAutoEnergyDevice");
-            Method getInstance = cls.getMethod("getInstance", Context.class);
-            energyDevice = getInstance.invoke(null, context);
+            Class<?> cls = loadBydClass("android.hardware.bydauto.energy.BYDAutoEnergyDevice");
+            energyDevice = getDeviceInstance(cls, context);
             methodGetEnergyMode = cls.getMethod("getEnergyMode");
             methodGetOperationMode = cls.getMethod("getOperationMode");
             anyDeviceAvailable = true;
@@ -202,10 +329,9 @@ public final class VehicleDataProvider {
 
         // 차체(Bodywork) 디바이스 — 전원 단계(시동 상태) 조회용
         try {
-            Class<?> cls = Class.forName(
+            Class<?> cls = loadBydClass(
                     "android.hardware.bydauto.bodywork.BYDAutoBodyworkDevice");
-            Method getInstance = cls.getMethod("getInstance", Context.class);
-            bodyworkDevice = getInstance.invoke(null, context);
+            bodyworkDevice = getDeviceInstance(cls, context);
             methodGetPowerLevel = cls.getMethod("getPowerLevel");
             anyDeviceAvailable = true;
             Log.i(TAG, "BYD bodywork device initialized");
@@ -296,26 +422,20 @@ public final class VehicleDataProvider {
             }
 
             int gearBlinkBeltFlags = 0;
-            int rawGearValue = Integer.MIN_VALUE; // API 원시 반환값 (디버깅용)
+            int rawGearValue = Integer.MIN_VALUE;
             if (gearDevice == null) {
                 if (!gearNullLogged) {
                     gearNullLogged = true;
                     LogBuffer buf = logBuffer;
-                    if (buf != null) {
-                        buf.append("BYDGearErr", "gearDevice is null");
-                    }
+                    if (buf != null) buf.append("BYDGearErr", "gearDevice is null");
                 }
-            } else if (gearDevice != null) {
+            } else {
                 try {
                     Object v = methodGetGearboxAutoModeType.invoke(gearDevice);
                     if (v instanceof Number) {
                         int g = ((Number) v).intValue();
                         rawGearValue = g;
-                        // BYDAutoGearboxDevice.getGearboxAutoModeType() 반환값
-                        // — GEARBOX_AUTO_MODE_P/R/N/D 상수 실제 값은 차량 테스트로 확인
-                        // — raw 값은 오버레이에 ?:X 로 표시됨
-                        // 아래는 공통 AT 순서 추정값 (P=0,R=1,N=2,D=3 또는 P=3,R=2,N=1,D=0)
-                        // 실차 확인 후 수정 필요
+                        // API 문서 기준 기어 매핑:
                         // GEARBOX_AUTO_MODE_P=1, R=2, N=3, D=4, M=5, S=6
                         if (g == 1) {
                             gearBlinkBeltFlags |= 0x01; // P
@@ -342,34 +462,50 @@ public final class VehicleDataProvider {
 
             int lightFlags = 0;
             if (lightDevice != null) {
-                try {
-                    // LIGHT_SIDE=1, LIGHT_LOW_BEAM=2, LIGHT_HIGH_BEAM=3
-                    // LIGHT_LEFT_TURN_SIGNAL=4, LIGHT_RIGHT_TURN_SIGNAL=5, LIGHT_FRONT_FOG=6
-                    Object sideLight  = methodGetLightStatus.invoke(lightDevice, 1);
-                    Object lowBeam    = methodGetLightStatus.invoke(lightDevice, 2);
-                    Object highBeam   = methodGetLightStatus.invoke(lightDevice, 3);
-                    Object leftTurn   = methodGetLightStatus.invoke(lightDevice, 4);
-                    Object rightTurn  = methodGetLightStatus.invoke(lightDevice, 5);
-                    Object frontFog   = methodGetLightStatus.invoke(lightDevice, 6);
-                    if (sideLight instanceof Number && ((Number) sideLight).intValue() != 0) {
-                        lightFlags |= 0x01; // bit0=위치등
+                // 방향지시등: getTurnLightFlashState 우선, 없으면 getLightStatus fallback
+                if (methodGetTurnLightFlashState != null) {
+                    try {
+                        Object v = methodGetTurnLightFlashState.invoke(lightDevice);
+                        if (v instanceof Number) {
+                            int state = ((Number) v).intValue();
+                            // BeetleLauncher 확인: 2/3=left, 4/5=right
+                            if (state == 2 || state == 3) {
+                                gearBlinkBeltFlags |= (1 << 4); // 좌회전
+                            } else if (state == 4 || state == 5) {
+                                gearBlinkBeltFlags |= (1 << 5); // 우회전
+                            }
+                        }
+                    } catch (Exception ignored) {
                     }
-                    if (lowBeam instanceof Number && ((Number) lowBeam).intValue() != 0) {
-                        lightFlags |= 0x02; // bit1=하향등
+                } else if (methodGetLightStatus != null) {
+                    try {
+                        Object leftTurn  = methodGetLightStatus.invoke(lightDevice, 4);
+                        Object rightTurn = methodGetLightStatus.invoke(lightDevice, 5);
+                        if (leftTurn instanceof Number && ((Number) leftTurn).intValue() != 0)
+                            gearBlinkBeltFlags |= (1 << 4);
+                        if (rightTurn instanceof Number && ((Number) rightTurn).intValue() != 0)
+                            gearBlinkBeltFlags |= (1 << 5);
+                    } catch (Exception ignored) {
                     }
-                    if (highBeam instanceof Number && ((Number) highBeam).intValue() != 0) {
-                        lightFlags |= 0x04; // bit2=상향등
+                }
+
+                // 차량 조명 상태 (위치등/하향등/상향등/안개등)
+                if (methodGetLightStatus != null) {
+                    try {
+                        Object sideLight = methodGetLightStatus.invoke(lightDevice, 1);
+                        Object lowBeam   = methodGetLightStatus.invoke(lightDevice, 2);
+                        Object highBeam  = methodGetLightStatus.invoke(lightDevice, 3);
+                        Object frontFog  = methodGetLightStatus.invoke(lightDevice, 6);
+                        if (sideLight instanceof Number && ((Number) sideLight).intValue() != 0)
+                            lightFlags |= 0x01;
+                        if (lowBeam instanceof Number && ((Number) lowBeam).intValue() != 0)
+                            lightFlags |= 0x02;
+                        if (highBeam instanceof Number && ((Number) highBeam).intValue() != 0)
+                            lightFlags |= 0x04;
+                        if (frontFog instanceof Number && ((Number) frontFog).intValue() != 0)
+                            lightFlags |= 0x08;
+                    } catch (Exception ignored) {
                     }
-                    if (frontFog instanceof Number && ((Number) frontFog).intValue() != 0) {
-                        lightFlags |= 0x08; // bit3=안개등
-                    }
-                    if (leftTurn instanceof Number && ((Number) leftTurn).intValue() != 0) {
-                        gearBlinkBeltFlags |= (1 << 4); // 좌회전
-                    }
-                    if (rightTurn instanceof Number && ((Number) rightTurn).intValue() != 0) {
-                        gearBlinkBeltFlags |= (1 << 5); // 우회전
-                    }
-                } catch (Exception ignored) {
                 }
             }
 
