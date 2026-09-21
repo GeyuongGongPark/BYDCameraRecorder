@@ -40,16 +40,6 @@ public final class RecorderSettings {
     private static final String KEY_PARKING_IMPACT_THRESHOLD_G = "parking_impact_threshold_g";
     private static final String KEY_PARKING_RECORDING_SECONDS = "parking_recording_seconds";
     private static final String KEY_PARKING_AUTO_LOCK = "parking_auto_lock";
-    private static final String KEY_TELEGRAM_ENABLED = "telegram_enabled";
-    private static final String KEY_TELEGRAM_BOT_TOKEN = "telegram_bot_token";
-    private static final String KEY_TELEGRAM_CHAT_ID = "telegram_chat_id";
-    private static final String KEY_MQTT_ENABLED = "mqtt_enabled";
-    private static final String KEY_MQTT_HOST = "mqtt_host";
-    private static final String KEY_MQTT_PORT = "mqtt_port";
-    private static final String KEY_MQTT_USERNAME = "mqtt_username";
-    private static final String KEY_MQTT_PASSWORD = "mqtt_password";
-    private static final String KEY_MQTT_TOPIC_PREFIX = "mqtt_topic_prefix";
-    private static final String KEY_CLOUDFLARE_ENABLED = "cloudflare_enabled";
     private static final String KEY_CAMERA_MOTION_ENABLED = "camera_motion_enabled";
     private static final String KEY_CAMERA_MOTION_SENSITIVITY = "camera_motion_sensitivity";
     private static final String KEY_TELEMETRY_ENABLED = "telemetry_enabled";
@@ -99,16 +89,6 @@ public final class RecorderSettings {
     public final float parkingImpactThresholdG;
     public final int parkingRecordingSeconds;
     public final boolean parkingAutoLock;
-    public final boolean telegramEnabled;
-    public final String telegramBotToken;
-    public final String telegramChatId;
-    public final boolean mqttEnabled;
-    public final String mqttHost;
-    public final int mqttPort;
-    public final String mqttUsername;
-    public final String mqttPassword;
-    public final String mqttTopicPrefix;
-    public final boolean cloudflareEnabled;
     public final boolean cameraMotionEnabled;
     public final int cameraMotionSensitivity;
     public final boolean telemetryEnabled;
@@ -141,16 +121,6 @@ public final class RecorderSettings {
             float parkingImpactThresholdG,
             int parkingRecordingSeconds,
             boolean parkingAutoLock,
-            boolean telegramEnabled,
-            String telegramBotToken,
-            String telegramChatId,
-            boolean mqttEnabled,
-            String mqttHost,
-            int mqttPort,
-            String mqttUsername,
-            String mqttPassword,
-            String mqttTopicPrefix,
-            boolean cloudflareEnabled,
             boolean cameraMotionEnabled,
             int cameraMotionSensitivity,
             boolean telemetryEnabled,
@@ -209,16 +179,6 @@ public final class RecorderSettings {
                 ParkingGuardSettings.MIN_RECORDING_SECONDS,
                 ParkingGuardSettings.MAX_RECORDING_SECONDS);
         this.parkingAutoLock = parkingAutoLock;
-        this.telegramEnabled = telegramEnabled;
-        this.telegramBotToken = telegramBotToken == null ? "" : telegramBotToken;
-        this.telegramChatId = telegramChatId == null ? "" : telegramChatId;
-        this.mqttEnabled = mqttEnabled;
-        this.mqttHost = mqttHost == null ? "" : mqttHost;
-        this.mqttPort = clamp(mqttPort, 1, 65535);
-        this.mqttUsername = mqttUsername == null ? "" : mqttUsername;
-        this.mqttPassword = mqttPassword == null ? "" : mqttPassword;
-        this.mqttTopicPrefix = mqttTopicPrefix == null ? "byd" : mqttTopicPrefix;
-        this.cloudflareEnabled = cloudflareEnabled;
         this.cameraMotionEnabled = cameraMotionEnabled;
         this.cameraMotionSensitivity = clamp(cameraMotionSensitivity, 1, 5);
         this.telemetryEnabled = telemetryEnabled;
@@ -274,16 +234,6 @@ public final class RecorderSettings {
                         KEY_PARKING_RECORDING_SECONDS,
                         ParkingGuardSettings.DEFAULT_RECORDING_SECONDS),
                 preferences.getBoolean(KEY_PARKING_AUTO_LOCK, true),
-                preferences.getBoolean(KEY_TELEGRAM_ENABLED, false),
-                preferences.getString(KEY_TELEGRAM_BOT_TOKEN, ""),
-                preferences.getString(KEY_TELEGRAM_CHAT_ID, ""),
-                preferences.getBoolean(KEY_MQTT_ENABLED, false),
-                preferences.getString(KEY_MQTT_HOST, ""),
-                preferences.getInt(KEY_MQTT_PORT, 1883),
-                preferences.getString(KEY_MQTT_USERNAME, ""),
-                preferences.getString(KEY_MQTT_PASSWORD, ""),
-                preferences.getString(KEY_MQTT_TOPIC_PREFIX, "byd"),
-                preferences.getBoolean(KEY_CLOUDFLARE_ENABLED, false),
                 preferences.getBoolean(KEY_CAMERA_MOTION_ENABLED, false),
                 preferences.getInt(KEY_CAMERA_MOTION_SENSITIVITY, 3),
                 preferences.getBoolean(KEY_TELEMETRY_ENABLED, true),
@@ -322,16 +272,6 @@ public final class RecorderSettings {
                 .putFloat(KEY_PARKING_IMPACT_THRESHOLD_G, parkingImpactThresholdG)
                 .putInt(KEY_PARKING_RECORDING_SECONDS, parkingRecordingSeconds)
                 .putBoolean(KEY_PARKING_AUTO_LOCK, parkingAutoLock)
-                .putBoolean(KEY_TELEGRAM_ENABLED, telegramEnabled)
-                .putString(KEY_TELEGRAM_BOT_TOKEN, telegramBotToken)
-                .putString(KEY_TELEGRAM_CHAT_ID, telegramChatId)
-                .putBoolean(KEY_MQTT_ENABLED, mqttEnabled)
-                .putString(KEY_MQTT_HOST, mqttHost)
-                .putInt(KEY_MQTT_PORT, mqttPort)
-                .putString(KEY_MQTT_USERNAME, mqttUsername)
-                .putString(KEY_MQTT_PASSWORD, mqttPassword)
-                .putString(KEY_MQTT_TOPIC_PREFIX, mqttTopicPrefix)
-                .putBoolean(KEY_CLOUDFLARE_ENABLED, cloudflareEnabled)
                 .putBoolean(KEY_CAMERA_MOTION_ENABLED, cameraMotionEnabled)
                 .putInt(KEY_CAMERA_MOTION_SENSITIVITY, cameraMotionSensitivity)
                 .putBoolean(KEY_TELEMETRY_ENABLED, telemetryEnabled)
@@ -425,16 +365,6 @@ public final class RecorderSettings {
                 parkingImpactThresholdG,
                 parkingRecordingSeconds,
                 parkingAutoLock,
-                telegramEnabled,
-                telegramBotToken,
-                telegramChatId,
-                mqttEnabled,
-                mqttHost,
-                mqttPort,
-                mqttUsername,
-                mqttPassword,
-                mqttTopicPrefix,
-                cloudflareEnabled,
                 cameraMotionEnabled,
                 cameraMotionSensitivity,
                 telemetryEnabled,
@@ -472,16 +402,6 @@ public final class RecorderSettings {
                 parkingImpactThresholdG,
                 parkingRecordingSeconds,
                 parkingAutoLock,
-                telegramEnabled,
-                telegramBotToken,
-                telegramChatId,
-                mqttEnabled,
-                mqttHost,
-                mqttPort,
-                mqttUsername,
-                mqttPassword,
-                mqttTopicPrefix,
-                cloudflareEnabled,
                 cameraMotionEnabled,
                 cameraMotionSensitivity,
                 telemetryEnabled,
@@ -516,16 +436,6 @@ public final class RecorderSettings {
                 parkingImpactThresholdG,
                 parkingRecordingSeconds,
                 parkingAutoLock,
-                telegramEnabled,
-                telegramBotToken,
-                telegramChatId,
-                mqttEnabled,
-                mqttHost,
-                mqttPort,
-                mqttUsername,
-                mqttPassword,
-                mqttTopicPrefix,
-                cloudflareEnabled,
                 cameraMotionEnabled,
                 cameraMotionSensitivity,
                 telemetryEnabled,
@@ -560,16 +470,6 @@ public final class RecorderSettings {
                 parkingImpactThresholdG,
                 parkingRecordingSeconds,
                 parkingAutoLock,
-                telegramEnabled,
-                telegramBotToken,
-                telegramChatId,
-                mqttEnabled,
-                mqttHost,
-                mqttPort,
-                mqttUsername,
-                mqttPassword,
-                mqttTopicPrefix,
-                cloudflareEnabled,
                 cameraMotionEnabled,
                 cameraMotionSensitivity,
                 telemetryEnabled,

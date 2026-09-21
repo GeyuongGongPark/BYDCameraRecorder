@@ -188,16 +188,6 @@ public final class MainActivity extends Activity
     private IconCheckbox parkingAutoLockCheckbox;
     private IconCheckbox cameraMotionEnabledCheckbox;
     private NumericStepper cameraMotionSensitivityStepper;
-    private IconCheckbox telegramEnabledCheckbox;
-    private EditText telegramBotTokenInput;
-    private EditText telegramChatIdInput;
-    private IconCheckbox mqttEnabledCheckbox;
-    private EditText mqttHostInput;
-    private NumericStepper mqttPortStepper;
-    private EditText mqttUsernameInput;
-    private EditText mqttPasswordInput;
-    private EditText mqttTopicPrefixInput;
-    private IconCheckbox cloudflareEnabledCheckbox;
     private IconCheckbox gpsOverlayEnabledCheckbox;
     private Spinner gpsSpeedUnitSpinner;
     private IconCheckbox gpsShowCoordinatesCheckbox;
@@ -1429,123 +1419,6 @@ public final class MainActivity extends Activity
         fields.addView(
                 labeledFieldWithoutHelp(getString(R.string.setting_camera_motion_sensitivity),
                         cameraMotionSensitivityStepper),
-                matchWidthWrap(dp(0), dp(10)));
-
-        // ── Telegram 알림 ──────────────────────────────────────────────
-        fields.addView(
-                sectionTitleWithHelp(
-                        getString(R.string.section_telegram),
-                        getString(R.string.telegram_description)),
-                matchWidthWrap(dp(0), dp(8)));
-        telegramEnabledCheckbox = new IconCheckbox(this,
-                getString(R.string.telegram_enabled_label));
-        telegramEnabledCheckbox.setListener(
-                new IconCheckbox.Listener() {
-                    @Override
-                    public void onCheckedChanged(boolean checked) {
-                        updateSettingsSaveState();
-                    }
-                });
-        fields.addView(
-                labeledFieldWithoutHelp(getString(R.string.setting_notifications_enabled),
-                        telegramEnabledCheckbox),
-                matchWidthWrap(dp(0), dp(8)));
-        telegramBotTokenInput = textInput();
-        telegramBotTokenInput.setHint("Bot Token");
-        telegramBotTokenInput.addTextChangedListener(settingsChangeWatcher());
-        fields.addView(
-                labeledFieldWithoutHelp("Bot Token", telegramBotTokenInput),
-                matchWidthWrap(dp(0), dp(8)));
-        telegramChatIdInput = textInput();
-        telegramChatIdInput.setHint("Chat ID");
-        telegramChatIdInput.addTextChangedListener(settingsChangeWatcher());
-        fields.addView(
-                labeledFieldWithoutHelp("Chat ID", telegramChatIdInput),
-                matchWidthWrap(dp(0), dp(10)));
-
-        // ── MQTT (Home Assistant) ──────────────────────────────────────
-        fields.addView(
-                sectionTitleWithHelp(
-                        getString(R.string.section_mqtt),
-                        getString(R.string.mqtt_description)),
-                matchWidthWrap(dp(0), dp(8)));
-        mqttEnabledCheckbox = new IconCheckbox(this, getString(R.string.mqtt_enabled_label));
-        mqttEnabledCheckbox.setListener(
-                new IconCheckbox.Listener() {
-                    @Override
-                    public void onCheckedChanged(boolean checked) {
-                        updateSettingsSaveState();
-                    }
-                });
-        fields.addView(
-                labeledFieldWithoutHelp(getString(R.string.setting_mqtt_enabled),
-                        mqttEnabledCheckbox),
-                matchWidthWrap(dp(0), dp(8)));
-        mqttHostInput = textInput();
-        mqttHostInput.setHint("192.168.1.100");
-        mqttHostInput.addTextChangedListener(settingsChangeWatcher());
-        fields.addView(
-                labeledFieldWithoutHelp(getString(R.string.setting_broker_address),
-                        mqttHostInput),
-                matchWidthWrap(dp(0), dp(8)));
-        mqttPortStepper = numericStepper(
-                new NumericStepper.Specification(
-                        "Port",
-                        1,
-                        65535,
-                        1,
-                        new NumericStepper.ValueFormatter() {
-                            @Override
-                            public String format(int value) {
-                                return String.valueOf(value);
-                            }
-                        }));
-        fields.addView(
-                labeledFieldWithoutHelp(getString(R.string.setting_port), mqttPortStepper),
-                matchWidthWrap(dp(0), dp(8)));
-        mqttUsernameInput = textInput();
-        mqttUsernameInput.setHint(getString(R.string.hint_optional));
-        mqttUsernameInput.addTextChangedListener(settingsChangeWatcher());
-        fields.addView(
-                labeledFieldWithoutHelp(getString(R.string.setting_username),
-                        mqttUsernameInput),
-                matchWidthWrap(dp(0), dp(8)));
-        mqttPasswordInput = textInput();
-        mqttPasswordInput.setHint(getString(R.string.hint_optional));
-        mqttPasswordInput.setInputType(
-                android.text.InputType.TYPE_CLASS_TEXT
-                        | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        mqttPasswordInput.addTextChangedListener(settingsChangeWatcher());
-        fields.addView(
-                labeledFieldWithoutHelp(getString(R.string.setting_password),
-                        mqttPasswordInput),
-                matchWidthWrap(dp(0), dp(8)));
-        mqttTopicPrefixInput = textInput();
-        mqttTopicPrefixInput.setHint("byd");
-        mqttTopicPrefixInput.addTextChangedListener(settingsChangeWatcher());
-        fields.addView(
-                labeledFieldWithoutHelp(getString(R.string.setting_topic_prefix),
-                        mqttTopicPrefixInput),
-                matchWidthWrap(dp(0), dp(10)));
-
-        // ── Cloudflare 터널 ────────────────────────────────────────────
-        fields.addView(
-                sectionTitleWithHelp(
-                        getString(R.string.section_cloudflare),
-                        getString(R.string.cloudflare_description)),
-                matchWidthWrap(dp(0), dp(8)));
-        cloudflareEnabledCheckbox = new IconCheckbox(this,
-                getString(R.string.cloudflare_enabled_label));
-        cloudflareEnabledCheckbox.setListener(
-                new IconCheckbox.Listener() {
-                    @Override
-                    public void onCheckedChanged(boolean checked) {
-                        updateSettingsSaveState();
-                    }
-                });
-        fields.addView(
-                labeledFieldWithoutHelp(getString(R.string.setting_tunnel_enabled),
-                        cloudflareEnabledCheckbox),
                 matchWidthWrap(dp(0), dp(10)));
 
         // ── GPS 오버레이 ────────────────────────────────────────────────
@@ -3642,36 +3515,6 @@ public final class MainActivity extends Activity
         if (cameraMotionSensitivityStepper != null) {
             cameraMotionSensitivityStepper.setValue(settings.cameraMotionSensitivity);
         }
-        if (telegramEnabledCheckbox != null) {
-            telegramEnabledCheckbox.setChecked(settings.telegramEnabled);
-        }
-        if (telegramBotTokenInput != null) {
-            telegramBotTokenInput.setText(settings.telegramBotToken);
-        }
-        if (telegramChatIdInput != null) {
-            telegramChatIdInput.setText(settings.telegramChatId);
-        }
-        if (mqttEnabledCheckbox != null) {
-            mqttEnabledCheckbox.setChecked(settings.mqttEnabled);
-        }
-        if (mqttHostInput != null) {
-            mqttHostInput.setText(settings.mqttHost);
-        }
-        if (mqttPortStepper != null) {
-            mqttPortStepper.setValue(settings.mqttPort);
-        }
-        if (mqttUsernameInput != null) {
-            mqttUsernameInput.setText(settings.mqttUsername);
-        }
-        if (mqttPasswordInput != null) {
-            mqttPasswordInput.setText(settings.mqttPassword);
-        }
-        if (mqttTopicPrefixInput != null) {
-            mqttTopicPrefixInput.setText(settings.mqttTopicPrefix);
-        }
-        if (cloudflareEnabledCheckbox != null) {
-            cloudflareEnabledCheckbox.setChecked(settings.cloudflareEnabled);
-        }
         if (gpsOverlayEnabledCheckbox != null) {
             gpsOverlayEnabledCheckbox.setChecked(settings.gpsOverlayEnabled);
         }
@@ -3860,16 +3703,6 @@ public final class MainActivity extends Activity
                 && Math.round(left.parkingImpactThresholdG * 10)
                         == Math.round(right.parkingImpactThresholdG * 10)
                 && left.parkingRecordingSeconds == right.parkingRecordingSeconds
-                && left.telegramEnabled == right.telegramEnabled
-                && left.telegramBotToken.equals(right.telegramBotToken)
-                && left.telegramChatId.equals(right.telegramChatId)
-                && left.mqttEnabled == right.mqttEnabled
-                && left.mqttHost.equals(right.mqttHost)
-                && left.mqttPort == right.mqttPort
-                && left.mqttUsername.equals(right.mqttUsername)
-                && left.mqttPassword.equals(right.mqttPassword)
-                && left.mqttTopicPrefix.equals(right.mqttTopicPrefix)
-                && left.cloudflareEnabled == right.cloudflareEnabled
                 && left.cameraMotionEnabled == right.cameraMotionEnabled
                 && left.cameraMotionSensitivity == right.cameraMotionSensitivity
                 && left.gpsOverlayEnabled == right.gpsOverlayEnabled
@@ -4698,36 +4531,6 @@ public final class MainActivity extends Activity
                     parkingAutoLockCheckbox != null
                             ? parkingAutoLockCheckbox.isChecked()
                             : settings.parkingAutoLock,
-                    telegramEnabledCheckbox != null
-                            ? telegramEnabledCheckbox.isChecked()
-                            : settings.telegramEnabled,
-                    telegramBotTokenInput != null
-                            ? telegramBotTokenInput.getText().toString().trim()
-                            : settings.telegramBotToken,
-                    telegramChatIdInput != null
-                            ? telegramChatIdInput.getText().toString().trim()
-                            : settings.telegramChatId,
-                    mqttEnabledCheckbox != null
-                            ? mqttEnabledCheckbox.isChecked()
-                            : settings.mqttEnabled,
-                    mqttHostInput != null
-                            ? mqttHostInput.getText().toString().trim()
-                            : settings.mqttHost,
-                    mqttPortStepper != null
-                            ? mqttPortStepper.getValue()
-                            : settings.mqttPort,
-                    mqttUsernameInput != null
-                            ? mqttUsernameInput.getText().toString().trim()
-                            : settings.mqttUsername,
-                    mqttPasswordInput != null
-                            ? mqttPasswordInput.getText().toString()
-                            : settings.mqttPassword,
-                    mqttTopicPrefixInput != null
-                            ? mqttTopicPrefixInput.getText().toString().trim()
-                            : settings.mqttTopicPrefix,
-                    cloudflareEnabledCheckbox != null
-                            ? cloudflareEnabledCheckbox.isChecked()
-                            : settings.cloudflareEnabled,
                     cameraMotionEnabledCheckbox != null
                             ? cameraMotionEnabledCheckbox.isChecked()
                             : settings.cameraMotionEnabled,

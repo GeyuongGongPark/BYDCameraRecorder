@@ -103,30 +103,6 @@
     <string name="notif_parking_recording">Parking guard — event recording</string>
     <string name="notif_phone_available">Phone connection available</string>
 
-    <!-- Telegram -->
-    <string name="section_telegram">Telegram notifications</string>
-    <string name="telegram_description">Receive Telegram messages for impact detection and parking guard events. Set Bot Token and Chat ID.</string>
-    <string name="setting_notifications_enabled">Notifications enabled</string>
-    <string name="telegram_enabled_label">Telegram notifications enabled</string>
-
-    <!-- MQTT -->
-    <string name="section_mqtt">MQTT (Home Assistant)</string>
-    <string name="mqtt_description">Publishes GPS, battery status, etc. to an MQTT broker. Supports Home Assistant MQTT Discovery.</string>
-    <string name="setting_mqtt_enabled">MQTT enabled</string>
-    <string name="mqtt_enabled_label">MQTT enabled</string>
-    <string name="setting_broker_address">Broker address</string>
-    <string name="setting_port">Port</string>
-    <string name="setting_username">Username</string>
-    <string name="setting_password">Password</string>
-    <string name="setting_topic_prefix">Topic prefix</string>
-    <string name="hint_optional">(optional)</string>
-
-    <!-- Cloudflare -->
-    <string name="section_cloudflare">External access (Cloudflare tunnel)</string>
-    <string name="cloudflare_description">Allows access to the phone app over the internet. Enabling it automatically downloads the cloudflared binary.</string>
-    <string name="setting_tunnel_enabled">Tunnel enabled</string>
-    <string name="cloudflare_enabled_label">Cloudflare tunnel enabled</string>
-
     <!-- Recordings -->
     <string name="section_recordings">Recordings</string>
 

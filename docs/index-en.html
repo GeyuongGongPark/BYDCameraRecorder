@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BYD Dashcam — Dashcam App for BYD Vehicles</title>
-  <meta name="description" content="Android dashcam app using BYD's built-in AVM cameras. 4-channel 360° recording, GPS overlay, parking guard with radar proximity detection, ignition-based auto-switching, battery/energy mode display, Telegram & MQTT alerts." />
+  <meta name="description" content="Android dashcam app using BYD's built-in AVM cameras. 4-channel 360° recording, GPS overlay, parking guard with radar proximity detection, ignition-based auto-switching, battery/energy mode display, real-time SSE phone alerts." />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -449,7 +449,7 @@
       <h1>Your built-in cameras.<br/><span>A complete dashcam.</span></h1>
       <p class="hero-desc">
         A no-hardware dashcam app powered by BYD's built-in AVM cameras.
-        4-channel 360° recording, GPS speed overlay, event pre-buffer, Telegram &amp; MQTT alerts — all included.
+        4-channel 360° recording, GPS speed overlay, event pre-buffer, and real-time SSE phone alerts — all included.
       </p>
       <div class="hero-actions">
         <a class="btn-primary" href="https://github.com/GeyuongGongPark/BYDCameraRecorder/releases/latest" target="_blank">
@@ -523,17 +523,12 @@
       <div class="feature-card">
         <div class="feature-icon icon-blue">&#128241;</div>
         <h3>Remote Phone Access</h3>
-        <p>Connect from your iOS or Android phone over the same Wi-Fi to view a live camera preview, browse and download recordings, and toggle parking guard. Cloudflare Tunnel enables access from anywhere.</p>
+        <p>Connect from your iOS or Android phone over the same Wi-Fi to view a live camera preview, browse and download recordings, and toggle parking guard.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon icon-yellow">&#128276;</div>
-        <h3>Telegram Alerts</h3>
-        <p>Receive instant Telegram notifications on impact or motion events. Just enter your Bot Token and Chat ID — no server setup needed.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon icon-green">&#127968;</div>
-        <h3>MQTT &amp; Home Assistant</h3>
-        <p>Publishes GPS, battery, and event data to any MQTT broker. Supports Home Assistant MQTT Discovery so sensors register automatically.</p>
+        <h3>Real-time Phone Alerts (SSE)</h3>
+        <p>Impact, motion, radar, door, window, and alarm events are pushed to the phone app instantly via Server-Sent Events — no external server, no third-party service, just a direct local Wi-Fi connection.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon icon-blue">&#9889;</div>
@@ -569,7 +564,7 @@
       <div class="step">
         <div class="step-num">4</div>
         <h3>Check from Your Phone</h3>
-        <p>Connect the phone app over Wi-Fi to view the live preview and event recordings. Telegram alerts notify you the moment an incident occurs.</p>
+        <p>Connect the phone app over Wi-Fi to view the live preview and event recordings. Impact, motion, and other events are pushed to your phone instantly via SSE.</p>
       </div>
     </div>
   </div>

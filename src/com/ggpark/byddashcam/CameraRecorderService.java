@@ -194,6 +194,7 @@ public final class CameraRecorderService extends Service
     private GpsOverlayRenderer gpsOverlayRenderer;
     private VehicleDataProvider vehicleDataProvider;
     private ParkingGuardController parkingGuardController;
+    private AccMonitorController accMonitorController;
     // 자동 주차/주행 모드 전환용
     private volatile double lastSpeedKmh = -1.0;
     private volatile double lastGpsSpeedKmh = -1.0;
@@ -206,10 +207,7 @@ public final class CameraRecorderService extends Service
     private final Runnable autoResumeRunnable = new Runnable() {
         @Override public void run() { tryAutoResume(); }
     };
-    private TelegramNotifier telegramNotifier;
-    private MqttPublisher mqttPublisher;
     private SystemMonitor systemMonitor;
-    private CloudflaredTunnel cloudflaredTunnel;
 
     private final Runnable recordingStartupTimeoutRunnable = new Runnable() {
         @Override
@@ -235,10 +233,8 @@ public final class CameraRecorderService extends Service
         applyPhoneAccessSetting(initialSettings);
         startGps(initialSettings);
         startVehicleTelemetry(initialSettings);
+        startAccMonitor();
         systemMonitor = new SystemMonitor();
-        initTelegramNotifier(initialSettings);
-        initMqttPublisher(initialSettings);
-        initCloudflaredTunnel(initialSettings);
         startSegmentRecoveryLoop();
     }
 
@@ -339,20 +335,9 @@ public final class CameraRecorderService extends Service
         segmentRecoveryLoopRunning = false;
         stopGps();
         stopVehicleTelemetry();
+        stopAccMonitor();
         shutdown();
         closePhonePreviewWorker();
-        if (telegramNotifier != null) {
-            telegramNotifier.shutdown();
-            telegramNotifier = null;
-        }
-        if (mqttPublisher != null) {
-            mqttPublisher.stop();
-            mqttPublisher = null;
-        }
-        if (cloudflaredTunnel != null) {
-            cloudflaredTunnel.stop();
-            cloudflaredTunnel = null;
-        }
         super.onDestroy();
     }
 
@@ -863,7 +848,6 @@ public final class CameraRecorderService extends Service
     public synchronized void applyRecorderSettings(RecorderSettings settings) {
         applyPhoneAccessSetting(settings);
         applyGpsSettings(settings);
-        applyNotificationSettings(settings);
         if (mode == Mode.RECORDING) {
             // Segment length and storage policy changes take effect on the
             // running recording instead of waiting for a restart.
@@ -881,69 +865,6 @@ public final class CameraRecorderService extends Service
                     settings.cameraFlipHorizontal(),
                     settings.cameraFlipVertical(),
                     settings.fisheyeCropPercent());
-        }
-    }
-
-    private void initTelegramNotifier(RecorderSettings settings) {
-        telegramNotifier = new TelegramNotifier(
-                settings.telegramBotToken,
-                settings.telegramChatId,
-                settings.telegramEnabled);
-    }
-
-    private void initMqttPublisher(RecorderSettings settings) {
-        mqttPublisher = new MqttPublisher(
-                settings.mqttHost,
-                settings.mqttPort,
-                settings.mqttUsername,
-                settings.mqttPassword,
-                settings.mqttEnabled);
-        mqttPublisher.start();
-    }
-
-    private void initCloudflaredTunnel(RecorderSettings settings) {
-        cloudflaredTunnel = new CloudflaredTunnel(
-                this,
-                8765,
-                RecorderSettings.load(this).phoneAccessCode,
-                settings.cloudflareEnabled);
-        cloudflaredTunnel.setListener(new CloudflaredTunnel.Listener() {
-            @Override
-            public void onTunnelUrl(String url) {
-                Log.i(TAG, "Cloudflare tunnel URL: " + url);
-                if (telegramNotifier != null) {
-                    telegramNotifier.send("외부 접속 URL: " + url);
-                }
-                publishState("터널: " + url);
-            }
-
-            @Override
-            public void onTunnelStopped() {
-                Log.i(TAG, "Cloudflare tunnel stopped");
-            }
-        });
-        if (settings.cloudflareEnabled) {
-            cloudflaredTunnel.start();
-        }
-    }
-
-    private void applyNotificationSettings(RecorderSettings settings) {
-        if (telegramNotifier != null) {
-            telegramNotifier.update(
-                    settings.telegramBotToken,
-                    settings.telegramChatId,
-                    settings.telegramEnabled);
-        }
-        if (mqttPublisher != null) {
-            mqttPublisher.update(
-                    settings.mqttHost,
-                    settings.mqttPort,
-                    settings.mqttUsername,
-                    settings.mqttPassword,
-                    settings.mqttEnabled);
-        }
-        if (cloudflaredTunnel != null) {
-            cloudflaredTunnel.update(settings.cloudflareEnabled);
         }
     }
 
@@ -1022,6 +943,55 @@ public final class CameraRecorderService extends Service
             vehicleDataProvider.stop();
             vehicleDataProvider = null;
         }
+    }
+
+    private void startAccMonitor() {
+        accMonitorController = new AccMonitorController(this);
+        accMonitorController.setListener(new AccMonitorController.Listener() {
+            @Override
+            public void onAccOff() {
+                mainHandler.post(new Runnable() {
+                    @Override public void run() { handleAccOff(); }
+                });
+            }
+            @Override
+            public void onAccOn() {
+                mainHandler.post(new Runnable() {
+                    @Override public void run() { handleAccOn(); }
+                });
+            }
+        });
+        accMonitorController.start();
+    }
+
+    private void stopAccMonitor() {
+        if (accMonitorController != null) {
+            accMonitorController.stop();
+            accMonitorController = null;
+        }
+    }
+
+    /**
+     * AccMonitorController: ACC OFF 감지 → 자동 모드 전환 설정이 켜져 있으면 센트리 진입.
+     * 속도 기반 자동 전환보다 빠르게 반응합니다.
+     */
+    private synchronized void handleAccOff() {
+        if (!isAutoModeSwitchEnabled()) return;
+        if (mode != Mode.RECORDING) return;
+        Log.i(TAG, "ACC OFF detected → entering parking mode");
+        mainHandler.removeCallbacks(autoParkRunnable);
+        enterParkingMode();
+    }
+
+    /**
+     * AccMonitorController: ACC ON 감지 → 센트리 모드이면 해제 후 녹화 재시작.
+     */
+    private synchronized void handleAccOn() {
+        if (!isParkingGuardActive()) return;
+        Log.i(TAG, "ACC ON detected → exiting parking mode");
+        mainHandler.removeCallbacks(autoResumeRunnable);
+        exitParkingMode();
+        startRecording(RecorderSettings.load(this));
     }
 
     private boolean isAutoModeSwitchEnabled() {
@@ -1210,6 +1180,18 @@ public final class CameraRecorderService extends Service
                         handleRadarRecordingStarted(area, level);
                     }
                     @Override
+                    public void onDoorRecordingStarted(int area) {
+                        handleDoorRecordingStarted(area);
+                    }
+                    @Override
+                    public void onWindowRecordingStarted(int area) {
+                        handleWindowRecordingStarted(area);
+                    }
+                    @Override
+                    public void onAlarmRecordingStarted() {
+                        handleAlarmRecordingStarted();
+                    }
+                    @Override
                     public void onImpactRecordingStopped() {
                         handleImpactRecordingStopped();
                     }
@@ -1283,17 +1265,9 @@ public final class CameraRecorderService extends Service
         }
         enterForeground();
         sendImpactNotification(gForce);
-        String impactMsg = "⚠️ 충격 감지: " + String.format("%.1f", gForce) + "G - 주차 녹화 시작";
-        if (telegramNotifier != null) {
-            telegramNotifier.send(impactMsg);
-        }
-        if (mqttPublisher != null) {
-            RecorderSettings s = RecorderSettings.load(this);
-            String prefix = s.mqttTopicPrefix;
-            mqttPublisher.publish(prefix + "/parking/impact",
-                    String.format("{\"gForce\":%.1f}", gForce));
-            mqttPublisher.publish(prefix + "/state", "parking_recording");
-        }
+        broadcastSseEvent(String.format(
+                "{\"type\":\"impact\",\"gForce\":%.1f,\"ts\":%d}",
+                gForce, System.currentTimeMillis()));
         publishState("충격 감지: " + String.format("%.1f", gForce) + "G - 녹화 시작");
     }
 
@@ -1334,15 +1308,7 @@ public final class CameraRecorderService extends Service
             }
         }
         enterForeground();
-        if (telegramNotifier != null) {
-            telegramNotifier.send("📹 모션 감지: 주차 녹화 시작");
-        }
-        if (mqttPublisher != null) {
-            RecorderSettings s = RecorderSettings.load(this);
-            String prefix = s.mqttTopicPrefix;
-            mqttPublisher.publish(prefix + "/parking/motion", "{\"detected\":true}");
-            mqttPublisher.publish(prefix + "/state", "parking_recording");
-        }
+        broadcastSseEvent("{\"type\":\"motion\",\"ts\":" + System.currentTimeMillis() + "}");
         publishState("모션 감지 - 주차 녹화 시작");
     }
 
@@ -1383,17 +1349,131 @@ public final class CameraRecorderService extends Service
             }
         }
         enterForeground();
-        if (telegramNotifier != null) {
-            telegramNotifier.send("🅿️ 레이더 근접 감지 (구역" + area + "): 주차 녹화 시작");
-        }
-        if (mqttPublisher != null) {
-            RecorderSettings s = RecorderSettings.load(this);
-            String prefix = s.mqttTopicPrefix;
-            mqttPublisher.publish(prefix + "/parking/radar",
-                    "{\"area\":" + area + ",\"level\":" + level + "}");
-            mqttPublisher.publish(prefix + "/state", "parking_recording");
-        }
+        broadcastSseEvent("{\"type\":\"radar\",\"area\":" + area
+                + ",\"level\":" + level + ",\"ts\":" + System.currentTimeMillis() + "}");
         publishState("레이더 감지 - 주차 녹화 시작 (구역" + area + ")");
+    }
+
+    private synchronized void handleDoorRecordingStarted(int area) {
+        if (mode != Mode.PARKING_STANDBY) {
+            return;
+        }
+        Log.i(TAG, "Parking door opened: area=" + area + " - starting recording");
+        mode = Mode.PARKING_RECORDING;
+        RecorderSettings settings = RecorderSettings.load(this);
+        segmentRecorder.setEventMetadata("door", 0f);
+        if (segmentRecorder.isStarted()) {
+            List<File> preBufferDirs = segmentRecorder.getAndClearPreBufferDirs();
+            if (settings.parkingAutoLock) {
+                for (File dir : preBufferDirs) {
+                    try {
+                        storageRepository.setLocked(settings, dir, true);
+                        Log.i(TAG, "Pre-buffer dir locked (door): " + dir.getName());
+                    } catch (IOException e) {
+                        Log.w(TAG, "Failed to lock pre-buffer dir: " + dir.getName(), e);
+                    }
+                }
+                segmentRecorder.setAutoLockForNextSegment();
+            }
+            try {
+                segmentRecorder.rotateNow(false);
+            } catch (IOException exception) {
+                Log.e(TAG, "Door recording rotate failed", exception);
+            }
+        } else {
+            lastRecordedFrameNanos = 0L;
+            pendingRecordingSettings = settings.withContinuousRecordingEnabled(false);
+            scheduleRecordingStartupTimeout();
+            if (settings.parkingAutoLock) {
+                segmentRecorder.setAutoLockForNextSegment();
+            }
+        }
+        enterForeground();
+        sendParkingNotification("🚪 도어 열림 감지");
+        broadcastSseEvent("{\"type\":\"door\",\"area\":" + area
+                + ",\"ts\":" + System.currentTimeMillis() + "}");
+        publishState("도어 열림 - 주차 녹화 시작 (구역" + area + ")");
+    }
+
+    private synchronized void handleWindowRecordingStarted(int area) {
+        if (mode != Mode.PARKING_STANDBY) {
+            return;
+        }
+        Log.i(TAG, "Parking window opened: area=" + area + " - starting recording");
+        mode = Mode.PARKING_RECORDING;
+        RecorderSettings settings = RecorderSettings.load(this);
+        segmentRecorder.setEventMetadata("window", 0f);
+        if (segmentRecorder.isStarted()) {
+            List<File> preBufferDirs = segmentRecorder.getAndClearPreBufferDirs();
+            if (settings.parkingAutoLock) {
+                for (File dir : preBufferDirs) {
+                    try {
+                        storageRepository.setLocked(settings, dir, true);
+                        Log.i(TAG, "Pre-buffer dir locked (window): " + dir.getName());
+                    } catch (IOException e) {
+                        Log.w(TAG, "Failed to lock pre-buffer dir: " + dir.getName(), e);
+                    }
+                }
+                segmentRecorder.setAutoLockForNextSegment();
+            }
+            try {
+                segmentRecorder.rotateNow(false);
+            } catch (IOException exception) {
+                Log.e(TAG, "Window recording rotate failed", exception);
+            }
+        } else {
+            lastRecordedFrameNanos = 0L;
+            pendingRecordingSettings = settings.withContinuousRecordingEnabled(false);
+            scheduleRecordingStartupTimeout();
+            if (settings.parkingAutoLock) {
+                segmentRecorder.setAutoLockForNextSegment();
+            }
+        }
+        enterForeground();
+        sendParkingNotification("🪟 창문 열림 감지");
+        broadcastSseEvent("{\"type\":\"window\",\"area\":" + area
+                + ",\"ts\":" + System.currentTimeMillis() + "}");
+        publishState("창문 열림 - 주차 녹화 시작 (구역" + area + ")");
+    }
+
+    private synchronized void handleAlarmRecordingStarted() {
+        if (mode != Mode.PARKING_STANDBY) {
+            return;
+        }
+        Log.i(TAG, "Parking vehicle alarm activated - starting recording");
+        mode = Mode.PARKING_RECORDING;
+        RecorderSettings settings = RecorderSettings.load(this);
+        segmentRecorder.setEventMetadata("alarm", 0f);
+        if (segmentRecorder.isStarted()) {
+            List<File> preBufferDirs = segmentRecorder.getAndClearPreBufferDirs();
+            if (settings.parkingAutoLock) {
+                for (File dir : preBufferDirs) {
+                    try {
+                        storageRepository.setLocked(settings, dir, true);
+                        Log.i(TAG, "Pre-buffer dir locked (alarm): " + dir.getName());
+                    } catch (IOException e) {
+                        Log.w(TAG, "Failed to lock pre-buffer dir: " + dir.getName(), e);
+                    }
+                }
+                segmentRecorder.setAutoLockForNextSegment();
+            }
+            try {
+                segmentRecorder.rotateNow(false);
+            } catch (IOException exception) {
+                Log.e(TAG, "Alarm recording rotate failed", exception);
+            }
+        } else {
+            lastRecordedFrameNanos = 0L;
+            pendingRecordingSettings = settings.withContinuousRecordingEnabled(false);
+            scheduleRecordingStartupTimeout();
+            if (settings.parkingAutoLock) {
+                segmentRecorder.setAutoLockForNextSegment();
+            }
+        }
+        enterForeground();
+        sendParkingNotification("🚨 차량 알람 감지");
+        broadcastSseEvent("{\"type\":\"alarm\",\"ts\":" + System.currentTimeMillis() + "}");
+        publishState("알람 활성화 - 주차 녹화 시작");
     }
 
     private synchronized void handleImpactRecordingStopped() {
@@ -1581,16 +1661,6 @@ public final class CameraRecorderService extends Service
                 current.parkingImpactThresholdG,
                 current.parkingRecordingSeconds,
                 current.parkingAutoLock,
-                PhoneJson.booleanValue(json, "telegramEnabled", current.telegramEnabled),
-                PhoneJson.stringValue(json, "telegramBotToken", current.telegramBotToken),
-                PhoneJson.stringValue(json, "telegramChatId", current.telegramChatId),
-                PhoneJson.booleanValue(json, "mqttEnabled", current.mqttEnabled),
-                PhoneJson.stringValue(json, "mqttHost", current.mqttHost),
-                PhoneJson.intValue(json, "mqttPort", current.mqttPort),
-                PhoneJson.stringValue(json, "mqttUsername", current.mqttUsername),
-                PhoneJson.stringValue(json, "mqttPassword", current.mqttPassword),
-                PhoneJson.stringValue(json, "mqttTopicPrefix", current.mqttTopicPrefix),
-                PhoneJson.booleanValue(json, "cloudflareEnabled", current.cloudflareEnabled),
                 current.cameraMotionEnabled,
                 current.cameraMotionSensitivity,
                 current.telemetryEnabled,
@@ -2024,6 +2094,30 @@ public final class CameraRecorderService extends Service
         }
     }
 
+    private void sendParkingNotification(String contentText) {
+        createNotificationChannel();
+        try {
+            Intent activityIntent = new Intent(this, MainActivity.class);
+            PendingIntent pendingIntent = PendingIntent.getActivity(
+                    this, 1, activityIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+            Notification notification = createParkingNotificationBuilder()
+                    .setSmallIcon(R.drawable.ic_record)
+                    .setContentTitle("이벤트 녹화")
+                    .setContentText(contentText)
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(true)
+                    .setCategory(Notification.CATEGORY_EVENT)
+                    .build();
+            NotificationManager nm =
+                    (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                nm.notify(PARKING_NOTIFICATION_ID, notification);
+            }
+        } catch (Exception exception) {
+            Log.w(TAG, "Parking notification failed", exception);
+        }
+    }
+
     private Notification.Builder createParkingNotificationBuilder() {
         if (Build.VERSION.SDK_INT < 26) {
             return new Notification.Builder(this);
@@ -2241,6 +2335,13 @@ public final class CameraRecorderService extends Service
                 .append(",\"isPreBuffer\":")
                 .append(isPreBuffer);
         json.append("]}");
+    }
+
+    private void broadcastSseEvent(String eventJson) {
+        PhoneAccessServer server = phoneAccessServer;
+        if (server != null) {
+            server.broadcastParkingEvent(eventJson);
+        }
     }
 
     private void closePhoneAccessServer() {
