@@ -208,6 +208,7 @@ public final class CameraRecorderService extends Service
         @Override public void run() { tryAutoResume(); }
     };
     private SystemMonitor systemMonitor;
+    private CloudflaredTunnel cloudflaredTunnel;
 
     private final Runnable recordingStartupTimeoutRunnable = new Runnable() {
         @Override
@@ -235,6 +236,7 @@ public final class CameraRecorderService extends Service
         startVehicleTelemetry(initialSettings);
         startAccMonitor();
         systemMonitor = new SystemMonitor();
+        initCloudflaredTunnel(initialSettings);
         startSegmentRecoveryLoop();
     }
 
@@ -338,6 +340,10 @@ public final class CameraRecorderService extends Service
         stopAccMonitor();
         shutdown();
         closePhonePreviewWorker();
+        if (cloudflaredTunnel != null) {
+            cloudflaredTunnel.stop();
+            cloudflaredTunnel = null;
+        }
         super.onDestroy();
     }
 
@@ -848,6 +854,7 @@ public final class CameraRecorderService extends Service
     public synchronized void applyRecorderSettings(RecorderSettings settings) {
         applyPhoneAccessSetting(settings);
         applyGpsSettings(settings);
+        applyCloudflareSettings(settings);
         if (mode == Mode.RECORDING) {
             // Segment length and storage policy changes take effect on the
             // running recording instead of waiting for a restart.
@@ -865,6 +872,35 @@ public final class CameraRecorderService extends Service
                     settings.cameraFlipHorizontal(),
                     settings.cameraFlipVertical(),
                     settings.fisheyeCropPercent());
+        }
+    }
+
+    private void initCloudflaredTunnel(RecorderSettings settings) {
+        cloudflaredTunnel = new CloudflaredTunnel(
+                this,
+                8765,
+                RecorderSettings.load(this).phoneAccessCode,
+                settings.cloudflareEnabled);
+        cloudflaredTunnel.setListener(new CloudflaredTunnel.Listener() {
+            @Override
+            public void onTunnelUrl(String url) {
+                Log.i(TAG, "Cloudflare tunnel URL: " + url);
+                publishState("터널: " + url);
+            }
+
+            @Override
+            public void onTunnelStopped() {
+                Log.i(TAG, "Cloudflare tunnel stopped");
+            }
+        });
+        if (settings.cloudflareEnabled) {
+            cloudflaredTunnel.start();
+        }
+    }
+
+    private void applyCloudflareSettings(RecorderSettings settings) {
+        if (cloudflaredTunnel != null) {
+            cloudflaredTunnel.update(settings.cloudflareEnabled);
         }
     }
 
@@ -1661,6 +1697,7 @@ public final class CameraRecorderService extends Service
                 current.parkingImpactThresholdG,
                 current.parkingRecordingSeconds,
                 current.parkingAutoLock,
+                current.cloudflareEnabled,
                 current.cameraMotionEnabled,
                 current.cameraMotionSensitivity,
                 current.telemetryEnabled,

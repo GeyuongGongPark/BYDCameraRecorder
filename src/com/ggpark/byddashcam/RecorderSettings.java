@@ -40,6 +40,7 @@ public final class RecorderSettings {
     private static final String KEY_PARKING_IMPACT_THRESHOLD_G = "parking_impact_threshold_g";
     private static final String KEY_PARKING_RECORDING_SECONDS = "parking_recording_seconds";
     private static final String KEY_PARKING_AUTO_LOCK = "parking_auto_lock";
+    private static final String KEY_CLOUDFLARE_ENABLED = "cloudflare_enabled";
     private static final String KEY_CAMERA_MOTION_ENABLED = "camera_motion_enabled";
     private static final String KEY_CAMERA_MOTION_SENSITIVITY = "camera_motion_sensitivity";
     private static final String KEY_TELEMETRY_ENABLED = "telemetry_enabled";
@@ -89,6 +90,7 @@ public final class RecorderSettings {
     public final float parkingImpactThresholdG;
     public final int parkingRecordingSeconds;
     public final boolean parkingAutoLock;
+    public final boolean cloudflareEnabled;
     public final boolean cameraMotionEnabled;
     public final int cameraMotionSensitivity;
     public final boolean telemetryEnabled;
@@ -121,6 +123,7 @@ public final class RecorderSettings {
             float parkingImpactThresholdG,
             int parkingRecordingSeconds,
             boolean parkingAutoLock,
+            boolean cloudflareEnabled,
             boolean cameraMotionEnabled,
             int cameraMotionSensitivity,
             boolean telemetryEnabled,
@@ -179,6 +182,7 @@ public final class RecorderSettings {
                 ParkingGuardSettings.MIN_RECORDING_SECONDS,
                 ParkingGuardSettings.MAX_RECORDING_SECONDS);
         this.parkingAutoLock = parkingAutoLock;
+        this.cloudflareEnabled = cloudflareEnabled;
         this.cameraMotionEnabled = cameraMotionEnabled;
         this.cameraMotionSensitivity = clamp(cameraMotionSensitivity, 1, 5);
         this.telemetryEnabled = telemetryEnabled;
@@ -234,6 +238,7 @@ public final class RecorderSettings {
                         KEY_PARKING_RECORDING_SECONDS,
                         ParkingGuardSettings.DEFAULT_RECORDING_SECONDS),
                 preferences.getBoolean(KEY_PARKING_AUTO_LOCK, true),
+                preferences.getBoolean(KEY_CLOUDFLARE_ENABLED, false),
                 preferences.getBoolean(KEY_CAMERA_MOTION_ENABLED, false),
                 preferences.getInt(KEY_CAMERA_MOTION_SENSITIVITY, 3),
                 preferences.getBoolean(KEY_TELEMETRY_ENABLED, true),
@@ -272,6 +277,7 @@ public final class RecorderSettings {
                 .putFloat(KEY_PARKING_IMPACT_THRESHOLD_G, parkingImpactThresholdG)
                 .putInt(KEY_PARKING_RECORDING_SECONDS, parkingRecordingSeconds)
                 .putBoolean(KEY_PARKING_AUTO_LOCK, parkingAutoLock)
+                .putBoolean(KEY_CLOUDFLARE_ENABLED, cloudflareEnabled)
                 .putBoolean(KEY_CAMERA_MOTION_ENABLED, cameraMotionEnabled)
                 .putInt(KEY_CAMERA_MOTION_SENSITIVITY, cameraMotionSensitivity)
                 .putBoolean(KEY_TELEMETRY_ENABLED, telemetryEnabled)
@@ -365,6 +371,7 @@ public final class RecorderSettings {
                 parkingImpactThresholdG,
                 parkingRecordingSeconds,
                 parkingAutoLock,
+                cloudflareEnabled,
                 cameraMotionEnabled,
                 cameraMotionSensitivity,
                 telemetryEnabled,
@@ -402,6 +409,7 @@ public final class RecorderSettings {
                 parkingImpactThresholdG,
                 parkingRecordingSeconds,
                 parkingAutoLock,
+                cloudflareEnabled,
                 cameraMotionEnabled,
                 cameraMotionSensitivity,
                 telemetryEnabled,
@@ -436,6 +444,7 @@ public final class RecorderSettings {
                 parkingImpactThresholdG,
                 parkingRecordingSeconds,
                 parkingAutoLock,
+                cloudflareEnabled,
                 cameraMotionEnabled,
                 cameraMotionSensitivity,
                 telemetryEnabled,
@@ -470,6 +479,7 @@ public final class RecorderSettings {
                 parkingImpactThresholdG,
                 parkingRecordingSeconds,
                 parkingAutoLock,
+                cloudflareEnabled,
                 cameraMotionEnabled,
                 cameraMotionSensitivity,
                 telemetryEnabled,

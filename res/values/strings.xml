@@ -103,6 +103,12 @@
     <string name="notif_parking_recording">Parking guard — event recording</string>
     <string name="notif_phone_available">Phone connection available</string>
 
+    <!-- Cloudflare -->
+    <string name="section_cloudflare">External access (Cloudflare tunnel)</string>
+    <string name="cloudflare_description">Allows the phone app to connect from outside the car\'s Wi-Fi. Enabling it automatically downloads the cloudflared binary on first use.</string>
+    <string name="setting_tunnel_enabled">Tunnel enabled</string>
+    <string name="cloudflare_enabled_label">Cloudflare tunnel enabled</string>
+
     <!-- Recordings -->
     <string name="section_recordings">Recordings</string>
 

@@ -188,6 +188,7 @@ public final class MainActivity extends Activity
     private IconCheckbox parkingAutoLockCheckbox;
     private IconCheckbox cameraMotionEnabledCheckbox;
     private NumericStepper cameraMotionSensitivityStepper;
+    private IconCheckbox cloudflareEnabledCheckbox;
     private IconCheckbox gpsOverlayEnabledCheckbox;
     private Spinner gpsSpeedUnitSpinner;
     private IconCheckbox gpsShowCoordinatesCheckbox;
@@ -1419,6 +1420,26 @@ public final class MainActivity extends Activity
         fields.addView(
                 labeledFieldWithoutHelp(getString(R.string.setting_camera_motion_sensitivity),
                         cameraMotionSensitivityStepper),
+                matchWidthWrap(dp(0), dp(10)));
+
+        // ── Cloudflare 터널 ────────────────────────────────────────────
+        fields.addView(
+                sectionTitleWithHelp(
+                        getString(R.string.section_cloudflare),
+                        getString(R.string.cloudflare_description)),
+                matchWidthWrap(dp(0), dp(8)));
+        cloudflareEnabledCheckbox = new IconCheckbox(this,
+                getString(R.string.cloudflare_enabled_label));
+        cloudflareEnabledCheckbox.setListener(
+                new IconCheckbox.Listener() {
+                    @Override
+                    public void onCheckedChanged(boolean checked) {
+                        updateSettingsSaveState();
+                    }
+                });
+        fields.addView(
+                labeledFieldWithoutHelp(getString(R.string.setting_tunnel_enabled),
+                        cloudflareEnabledCheckbox),
                 matchWidthWrap(dp(0), dp(10)));
 
         // ── GPS 오버레이 ────────────────────────────────────────────────
@@ -3515,6 +3536,9 @@ public final class MainActivity extends Activity
         if (cameraMotionSensitivityStepper != null) {
             cameraMotionSensitivityStepper.setValue(settings.cameraMotionSensitivity);
         }
+        if (cloudflareEnabledCheckbox != null) {
+            cloudflareEnabledCheckbox.setChecked(settings.cloudflareEnabled);
+        }
         if (gpsOverlayEnabledCheckbox != null) {
             gpsOverlayEnabledCheckbox.setChecked(settings.gpsOverlayEnabled);
         }
@@ -3703,6 +3727,7 @@ public final class MainActivity extends Activity
                 && Math.round(left.parkingImpactThresholdG * 10)
                         == Math.round(right.parkingImpactThresholdG * 10)
                 && left.parkingRecordingSeconds == right.parkingRecordingSeconds
+                && left.cloudflareEnabled == right.cloudflareEnabled
                 && left.cameraMotionEnabled == right.cameraMotionEnabled
                 && left.cameraMotionSensitivity == right.cameraMotionSensitivity
                 && left.gpsOverlayEnabled == right.gpsOverlayEnabled
@@ -4531,6 +4556,9 @@ public final class MainActivity extends Activity
                     parkingAutoLockCheckbox != null
                             ? parkingAutoLockCheckbox.isChecked()
                             : settings.parkingAutoLock,
+                    cloudflareEnabledCheckbox != null
+                            ? cloudflareEnabledCheckbox.isChecked()
+                            : settings.cloudflareEnabled,
                     cameraMotionEnabledCheckbox != null
                             ? cameraMotionEnabledCheckbox.isChecked()
                             : settings.cameraMotionEnabled,
