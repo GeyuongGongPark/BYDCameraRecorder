@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/recorder_state.dart';
 import '../models/server_config.dart';
 import '../services/api_service.dart';
+import '../services/event_stream_service.dart';
 import '../services/storage_service.dart';
 import 'camera_screen.dart';
 import 'files_screen.dart';
@@ -20,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final ApiService _api;
+  late final EventStreamService _eventStream;
   final _storage = StorageService();
 
   int _tabIndex = 0;
@@ -34,12 +36,14 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _api = ApiService(widget.config);
+    _eventStream = EventStreamService(widget.config);
     _init();
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _eventStream.disconnect();
     super.dispose();
   }
 
@@ -48,6 +52,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (session != null) _api.setSessionCookie(session);
 
     final authed = await _api.checkAuth();
+    if (authed) {
+      _eventStream.setSessionCookie(_api.sessionCookie);
+      _eventStream.connect();
+    }
     if (!authed && mounted) {
       final ok = await Navigator.push<bool>(
         context,
@@ -59,6 +67,9 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) Navigator.pop(context);
         return;
       }
+      // 로그인 완료 후 SSE 연결
+      _eventStream.setSessionCookie(_api.sessionCookie);
+      _eventStream.connect();
     }
     _startPolling();
   }

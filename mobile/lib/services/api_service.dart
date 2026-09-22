@@ -162,11 +162,11 @@ class ApiService {
     }
   }
 
+  String? get sessionCookie => _sessionCookie;
+
   void setSessionCookie(String? cookie) {
     _sessionCookie = cookie;
   }
-
-  String? get sessionCookie => _sessionCookie;
 
   // ── 디버그 로그 ──────────────────────────────────────────────────────────
 

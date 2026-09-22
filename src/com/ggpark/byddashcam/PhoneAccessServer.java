@@ -76,6 +76,9 @@ public final class PhoneAccessServer implements Closeable {
     private final AssetManager assets;
     private final Set<Socket> activeClients =
             Collections.newSetFromMap(new ConcurrentHashMap<Socket, Boolean>());
+    // SSE 이벤트 스트림 구독 클라이언트
+    private final Set<OutputStream> sseClients =
+            Collections.newSetFromMap(new ConcurrentHashMap<OutputStream, Boolean>());
     // One thread per open connection. Browsers hold camera WebSockets and
     // paused video downloads open for long periods, so a small fixed pool
     // starves every other request; a cached pool sizes itself to the
@@ -379,6 +382,11 @@ public final class PhoneAccessServer implements Closeable {
             sendJson(output, 200, service.createPhoneStateJson());
             return;
         }
+        if (relativePath.equals("api/events")
+                && request.method.equals("GET")) {
+            routeSseEvents(socket, output);
+            return;
+        }
         if (relativePath.equals("api/finalizing/stream")
                 && request.method.equals("GET")) {
             routeFinalizingWebSocket(socket, request);
@@ -555,6 +563,68 @@ public final class PhoneAccessServer implements Closeable {
      * payload is tiny, so pushing beats having the phone poll the heavy
      * full-state endpoint for progress updates.
      */
+
+    // -----------------------------------------------------------------------
+    // SSE 이벤트 스트림 — /api/events
+    // -----------------------------------------------------------------------
+
+    /**
+     * 주차 감시 이벤트를 모든 SSE 구독 클라이언트에 브로드캐스트합니다.
+     * eventJson 예: {"type":"impact","gForce":2.8,"timestamp":1234567890}
+     * CameraRecorderService의 이벤트 핸들러에서 호출됩니다.
+     */
+    public void broadcastParkingEvent(String eventJson) {
+        if (sseClients.isEmpty()) return;
+        byte[] data = ("data: " + eventJson + "\n\n")
+                .getBytes(StandardCharsets.UTF_8);
+        for (OutputStream out : sseClients) {
+            try {
+                out.write(data);
+                out.flush();
+            } catch (IOException e) {
+                sseClients.remove(out);
+            }
+        }
+    }
+
+    /**
+     * SSE 연결을 수락하고 이벤트 스트림을 열어둡니다.
+     * 30초마다 heartbeat comment를 전송하여 연결을 유지합니다.
+     */
+    private void routeSseEvents(Socket socket, OutputStream output)
+            throws IOException {
+        // SSE 응답 헤더 (Content-Length 없음 — 무한 스트림)
+        String headers = "HTTP/1.1 200 OK\r\n"
+                + "Content-Type: text/event-stream; charset=utf-8\r\n"
+                + "Cache-Control: no-cache\r\n"
+                + "Connection: keep-alive\r\n"
+                + "Access-Control-Allow-Origin: *\r\n"
+                + "\r\n";
+        output.write(headers.getBytes(StandardCharsets.UTF_8));
+        output.flush();
+
+        // 초기 연결 확인 이벤트
+        output.write("data: {\"type\":\"connected\"}\n\n"
+                .getBytes(StandardCharsets.UTF_8));
+        output.flush();
+
+        sseClients.add(output);
+        try {
+            // 30초마다 heartbeat — 연결이 끊어지면 IOException으로 탈출
+            while (!socket.isClosed()) {
+                Thread.sleep(30_000L);
+                output.write(": heartbeat\n\n".getBytes(StandardCharsets.UTF_8));
+                output.flush();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (IOException e) {
+            // 클라이언트가 연결 끊음 — 정상 종료
+        } finally {
+            sseClients.remove(output);
+        }
+    }
+
     private void routeFinalizingWebSocket(Socket socket, Request request)
             throws IOException {
         OutputStream output = socket.getOutputStream();

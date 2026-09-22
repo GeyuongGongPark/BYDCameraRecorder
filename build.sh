@@ -129,14 +129,16 @@ aapt package \
     -F "${build_dir}/app-unsigned.apk"
 
 # --------------------------------------------------------------------------
-# javac: stub 컴파일
+# javac: stub 컴파일 (stubs/ 하위 모든 .java 파일)
 # --------------------------------------------------------------------------
+find "${project_root}/stubs" -name '*.java' | sort \
+    > "${build_dir}/stubs.txt"
 javac \
     -source 8 \
     -target 8 \
     -classpath "${android_jar}" \
     -d "${stub_classes}" \
-    "${project_root}/stubs/android/hardware/AVMCamera.java"
+    @"${build_dir}/stubs.txt"
 
 # --------------------------------------------------------------------------
 # javac: 앱 소스 컴파일
