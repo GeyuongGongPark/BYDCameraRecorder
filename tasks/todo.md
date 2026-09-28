@@ -70,8 +70,25 @@
 - [x] BYD 기어 API 메서드명 오류: `getCurrentGear()` → `getGearboxAutoModeType()`
 - [x] 방향지시등 매핑 오류: 0/1=off, 2/3=left, 4/5=right (kinex 앱 분석으로 확인)
 - [x] 조명 API no-arg 호출 오류: `getLightStatus()` → `getLightStatus(int type)` (type=2 하향등, type=3 상향등)
+- [x] 신호 대기 30초 시 주행→주차 자동 전환 오작동
+  - 원인: speed/powerLevel API 차단(signature 권한) → 시동/기어 모두 판단 불가
+  - 수정: `tryAutoPark()`에 `rawGear != MIN && !isGearP()` 추가 안전장치
+  - 수정: 기어 raw 매핑(555=P, 629=D) + args[1] 유효성 체크(1-6이면 API 값으로 사용)
+- [ ] **기어 콜백 파라미터 확정** — ADB 재연결 후 `Gear onDataEventChanged()` 로그에서
+  - args[1]이 1=P, 4=D인지(API 값) 아니면 다른 형식인지 확인
+  - R, N raw 값 파악 후 매핑 테이블 완성
+- [ ] **속도/bodywork 리스너 콜백 확인** — `Speed onDataEventChanged()`, `Bodywork onDataEventChanged()` 로그
+  - 속도 args[0] 값이 실제 km/h인지, 다른 raw 형식인지 확인
+  - bodywork args[0]이 powerLevel(0-4)인지, 아니면 다른 이벤트 타입인지 확인
+  - 확인 후 매핑 조정 (VehicleDataProvider.java listenerSpeedKmh / listenerPowerLevel)
 
 ## 검증
 - [ ] 에뮬레이터에서 동작 확인
 - [ ] 실제 차량(Atto 3) 탑재 테스트 — 기어 raw 값 확인 후 P/R/N/D 매핑 검증
 - [ ] 회귀 테스트: 기존 녹화/세그먼트/잠금 기능 정상 동작 확인
+- [ ] 신호 대기 중 주차 전환 버그 수정 검증 (D 기어 + 정지 30초 이상)
+
+## 보안 검토 결과 (완료)
+- [x] `nextPinAttempts` 만료 항목 정리 추가 (`removeIf(e -> e.getValue() <= now)`)
+- [x] `api/debug/logs` 인증 없음 — **의도된 설계** (URL 토큰이 1차 보호), 되돌림
+- [~] PIN 6자리 + 5초 lockout, 세션 쿠키 HttpOnly/SameSite=Strict, path traversal 방어, constantTimeEquals — 모두 양호

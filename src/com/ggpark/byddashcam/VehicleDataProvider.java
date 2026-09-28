@@ -46,6 +46,10 @@ public final class VehicleDataProvider {
 
     private Object gearDevice;
     private Method methodGetGearboxAutoModeType;
+    // 리스너 방식으로 받은 값 (registerListener permission 체크 없음)
+    private volatile int listenerGearValue = Integer.MIN_VALUE;
+    private volatile int listenerSpeedKmh = Integer.MIN_VALUE;   // 속도 리스너 값
+    private volatile int listenerPowerLevel = Integer.MIN_VALUE; // bodywork 리스너 값
 
     private Object lightDevice;
     private Method methodGetTurnLightFlashState; // 주 방향지시등 소스 (BeetleLauncher 확인)
@@ -230,6 +234,66 @@ public final class VehicleDataProvider {
         return baos.toByteArray();
     }
 
+    // -----------------------------------------------------------------------
+    // 범용 리스너 등록 헬퍼 (기어 외 다른 device에도 재사용)
+    // -----------------------------------------------------------------------
+
+    private interface ListenerCallback {
+        void onDataEvent(String tag, Object[] args);
+    }
+
+    /**
+     * IBYDAutoListener Proxy를 device에 등록합니다.
+     * registerListener()는 permission 체크 없음 — 기어와 동일한 방식.
+     * onDataEventChanged 콜백이 오면 파라미터를 로그에 남기고 callback.onDataEvent() 호출.
+     */
+    private void tryRegisterListener(Class<?> deviceCls, Object device,
+            String logTag, ListenerCallback callback) {
+        try {
+            Class<?> iFace = loadBydClass("android.hardware.IBYDAutoListener");
+            if (!iFace.isInterface()) return;
+            final ListenerCallback cb = callback;
+            final String tag = logTag;
+            java.lang.reflect.InvocationHandler handler =
+                    new java.lang.reflect.InvocationHandler() {
+                @Override
+                public Object invoke(Object proxy, java.lang.reflect.Method method,
+                        Object[] args) throws Throwable {
+                    Class<?> ret = method.getReturnType();
+                    if (ret == int.class || ret == short.class || ret == byte.class) return 0;
+                    if (ret == long.class) return 0L;
+                    if (ret == boolean.class) return false;
+                    if (ret == float.class) return 0.0f;
+                    if (ret == double.class) return 0.0;
+                    if (ret == char.class) return '\0';
+                    String name = method.getName();
+                    if (name.equals("onDataEventChanged") && args != null) {
+                        StringBuilder sb = new StringBuilder(tag + " onDataEventChanged(");
+                        for (int i = 0; i < args.length; i++) {
+                            if (i > 0) sb.append(", ");
+                            Object a = args[i];
+                            sb.append(a == null ? "null"
+                                    : a.getClass().getSimpleName() + "=" + a);
+                        }
+                        sb.append(")");
+                        Log.d(TAG, sb.toString());
+                        cb.onDataEvent(tag, args);
+                    }
+                    return null;
+                }
+            };
+            Object proxy = java.lang.reflect.Proxy.newProxyInstance(
+                    iFace.getClassLoader(), new Class[]{iFace}, handler);
+            Method regMethod = deviceCls.getMethod("registerListener", iFace);
+            regMethod.invoke(device, proxy);
+            Log.i(TAG, "BYD " + logTag + " IBYDAutoListener registered");
+        } catch (Exception e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            Log.w(TAG, "BYD " + logTag + " listener failed ["
+                    + cause.getClass().getSimpleName() + "]: " + cause.getMessage());
+        }
+    }
+
     private Class<?> loadBydClass(String fqn) throws ClassNotFoundException {
         if (bydClassLoader != null) {
             return Class.forName(fqn, true, bydClassLoader);
@@ -262,24 +326,97 @@ public final class VehicleDataProvider {
         try {
             Class<?> cls = loadBydClass("android.hardware.bydauto.speed.BYDAutoSpeedDevice");
             speedDevice = getDeviceInstance(cls, context);
+            if (speedDevice == null) throw new RuntimeException("getInstance() returned null");
             methodGetCurrentSpeed = cls.getMethod("getCurrentSpeed");
             methodGetAccelerateDeepness = cls.getMethod("getAccelerateDeepness");
             methodGetBrakeDeepness = cls.getMethod("getBrakeDeepness");
             anyDeviceAvailable = true;
             Log.i(TAG, "BYD speed device initialized");
+            // 속도 리스너 등록 (permission 체크 없음 — 기어와 동일한 방식)
+            tryRegisterListener(cls, speedDevice, "Speed", new ListenerCallback() {
+                @Override public void onDataEvent(String tag, Object[] args) {
+                    if (args.length >= 1 && args[0] instanceof Number) {
+                        int v = ((Number) args[0]).intValue();
+                        // 0~300 범위면 km/h로 직접 사용, 아니면 로그만
+                        if (v >= 0 && v <= 300) listenerSpeedKmh = v;
+                    }
+                }
+            });
         } catch (Exception e) {
-            Log.w(TAG, "BYD speed device unavailable: " + e.getMessage());
+            Throwable cause = (e instanceof java.lang.reflect.InvocationTargetException) ? e.getCause() : e;
+            Log.w(TAG, "BYD speed device unavailable [" + (cause != null ? cause.getClass().getSimpleName() : e.getClass().getSimpleName()) + "]: " + (cause != null ? cause.getMessage() : e.getMessage()));
         }
 
         // 기어박스 디바이스
         try {
             Class<?> cls = loadBydClass("android.hardware.bydauto.gearbox.BYDAutoGearboxDevice");
             gearDevice = getDeviceInstance(cls, context);
+            if (gearDevice == null) throw new RuntimeException("getInstance() returned null");
             methodGetGearboxAutoModeType = cls.getMethod("getGearboxAutoModeType");
-            anyDeviceAvailable = true;
+            // 리스너 방식으로 기어 이벤트 수신 시도 (권한 우회 가능성 테스트)
+            // IBYDAutoListener는 인터페이스이므로 Proxy 사용 가능
+            try {
+                Class<?> iFace = loadBydClass("android.hardware.IBYDAutoListener");
+                if (iFace.isInterface()) {
+                    final java.lang.reflect.InvocationHandler handler =
+                            new java.lang.reflect.InvocationHandler() {
+                        @Override
+                        public Object invoke(Object proxy, java.lang.reflect.Method method,
+                                Object[] args) throws Throwable {
+                            // primitive 반환 타입 기본값 처리 (필수)
+                            Class<?> ret = method.getReturnType();
+                            if (ret == int.class || ret == short.class || ret == byte.class) return 0;
+                            if (ret == long.class) return 0L;
+                            if (ret == boolean.class) return false;
+                            if (ret == float.class) return 0.0f;
+                            if (ret == double.class) return 0.0;
+                            if (ret == char.class) return '\0';
+                            String name = method.getName();
+                            if (name.equals("onDataEventChanged") && args != null) {
+                                // 파라미터 전체 로그
+                                StringBuilder sb = new StringBuilder("Gear onDataEventChanged(");
+                                for (int i = 0; i < args.length; i++) {
+                                    if (i > 0) sb.append(", ");
+                                    Object a = args[i];
+                                    sb.append(a == null ? "null" : a.getClass().getSimpleName() + "=" + a);
+                                }
+                                sb.append(")");
+                                Log.d(TAG, sb.toString());
+                                // args[0]=channelId/rawValue, args[1]=API 기어 타입(1-6) 시도
+                                if (args.length >= 2 && args[1] instanceof Number) {
+                                    int v = ((Number) args[1]).intValue();
+                                    // API 기준 기어 타입(1=P,2=R,3=N,4=D,5=M,6=S)이면 직접 사용
+                                    if (v >= 1 && v <= 6) {
+                                        listenerGearValue = v;
+                                    } else {
+                                        listenerGearValue = ((Number) args[0]).intValue();
+                                    }
+                                } else if (args.length >= 1 && args[0] instanceof Number) {
+                                    listenerGearValue = ((Number) args[0]).intValue();
+                                }
+                            } else if (name.equals("onDataChanged") && args != null
+                                    && args.length >= 1) {
+                                Log.d(TAG, "Gear onDataChanged(" + (args[0] == null ? "null"
+                                        : args[0].getClass().getSimpleName() + "=" + args[0]) + ")");
+                            }
+                            return null;
+                        }
+                    };
+                    Object proxy = java.lang.reflect.Proxy.newProxyInstance(
+                            iFace.getClassLoader(), new Class[]{iFace}, handler);
+                    Method regMethod = cls.getMethod("registerListener", iFace);
+                    regMethod.invoke(gearDevice, proxy);
+                    Log.i(TAG, "BYD gear IBYDAutoListener registered");
+                }
+            } catch (Exception le) {
+                Throwable cause = le.getCause() != null ? le.getCause() : le;
+                Log.w(TAG, "BYD gear listener failed [" + cause.getClass().getSimpleName() + "]: "
+                        + cause.getMessage());
+            }
             Log.i(TAG, "BYD gear device initialized");
+            anyDeviceAvailable = true;
         } catch (Exception e) {
-            Log.w(TAG, "BYD gear device unavailable: " + e.getMessage());
+            Log.w(TAG, "BYD gear device unavailable [" + e.getClass().getSimpleName() + "]: " + e.getMessage());
         }
 
         // 조명 디바이스
@@ -332,11 +469,23 @@ public final class VehicleDataProvider {
             Class<?> cls = loadBydClass(
                     "android.hardware.bydauto.bodywork.BYDAutoBodyworkDevice");
             bodyworkDevice = getDeviceInstance(cls, context);
+            if (bodyworkDevice == null) throw new RuntimeException("getInstance() returned null");
             methodGetPowerLevel = cls.getMethod("getPowerLevel");
             anyDeviceAvailable = true;
             Log.i(TAG, "BYD bodywork device initialized");
+            // bodywork 리스너 등록 (powerLevel 변경 이벤트 — door/window 이벤트도 포함)
+            tryRegisterListener(cls, bodyworkDevice, "Bodywork", new ListenerCallback() {
+                @Override public void onDataEvent(String tag, Object[] args) {
+                    if (args.length >= 1 && args[0] instanceof Number) {
+                        int v = ((Number) args[0]).intValue();
+                        // powerLevel: 0=OFF, 1=ACC, 2=ON, 3=OK, 4=FAKE_OK
+                        if (v >= 0 && v <= 4) listenerPowerLevel = v;
+                    }
+                }
+            });
         } catch (Exception e) {
-            Log.w(TAG, "BYD bodywork device unavailable: " + e.getMessage());
+            Throwable cause2 = (e instanceof java.lang.reflect.InvocationTargetException) ? e.getCause() : e;
+            Log.w(TAG, "BYD bodywork device unavailable [" + (cause2 != null ? cause2.getClass().getSimpleName() : e.getClass().getSimpleName()) + "]: " + (cause2 != null ? cause2.getMessage() : e.getMessage()));
         }
     }
 
@@ -382,7 +531,14 @@ public final class VehicleDataProvider {
                         slowPowerLevel = ((Number) pl).intValue();
                     }
                 } catch (Exception ignored) {
+                    // 폴링 실패 시 리스너 값 사용
+                    int lv = listenerPowerLevel;
+                    if (lv != Integer.MIN_VALUE) slowPowerLevel = lv;
                 }
+            } else {
+                // device 자체가 없으면 리스너 값 사용
+                int lv = listenerPowerLevel;
+                if (lv != Integer.MIN_VALUE) slowPowerLevel = lv;
             }
         } catch (Exception e) {
             Log.w(TAG, "Vehicle slow poll failed", e);
@@ -402,6 +558,9 @@ public final class VehicleDataProvider {
                         speedKmh = Math.max(0, Math.min(255, ((Number) v).intValue()));
                     }
                 } catch (Exception ignored) {
+                    // 폴링 실패 시 리스너 값 사용
+                    int lv = listenerSpeedKmh;
+                    if (lv != Integer.MIN_VALUE) speedKmh = Math.max(0, Math.min(255, lv));
                 }
                 try {
                     Object v = methodGetAccelerateDeepness.invoke(speedDevice);
@@ -419,6 +578,12 @@ public final class VehicleDataProvider {
                     }
                 } catch (Exception ignored) {
                 }
+            }
+
+            // speedDevice null인 경우 리스너 값으로 보완
+            if (speedDevice == null) {
+                int lv = listenerSpeedKmh;
+                if (lv != Integer.MIN_VALUE) speedKmh = Math.max(0, Math.min(255, lv));
             }
 
             int gearBlinkBeltFlags = 0;
@@ -457,7 +622,28 @@ public final class VehicleDataProvider {
                         }
                         Log.w(TAG, "Gear invoke failed", e);
                     }
+                    // 폴링 실패 시 리스너에서 받은 최후 값 사용
+                    int lv = listenerGearValue;
+                    if (lv != Integer.MIN_VALUE) {
+                        rawGearValue = lv;
+                    }
                 }
+            }
+            // getGearboxAutoModeType 실패해도 리스너 값으로 보완
+            if (rawGearValue == Integer.MIN_VALUE) {
+                int lv = listenerGearValue;
+                if (lv != Integer.MIN_VALUE) rawGearValue = lv;
+            }
+            if (rawGearValue != Integer.MIN_VALUE) {
+                int g = rawGearValue;
+                gearBlinkBeltFlags = 0;
+                if (g == 1) gearBlinkBeltFlags |= 0x01;                 // P (API)
+                else if (g == 2) gearBlinkBeltFlags |= 0x02;            // R (API)
+                else if (g == 3) gearBlinkBeltFlags |= 0x04;            // N (API)
+                else if (g == 4 || g == 5 || g == 6) gearBlinkBeltFlags |= 0x08; // D/M/S (API)
+                // 관찰된 raw CAN 값 매핑 (args[1]이 API 타입 아닌 경우 fallback)
+                else if (g == 555) gearBlinkBeltFlags |= 0x01;          // raw P
+                else if (g == 629) gearBlinkBeltFlags |= 0x08;          // raw D
             }
 
             int lightFlags = 0;

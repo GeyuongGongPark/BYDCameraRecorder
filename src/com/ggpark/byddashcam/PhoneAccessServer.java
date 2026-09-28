@@ -474,6 +474,8 @@ public final class PhoneAccessServer implements Closeable {
             return;
         }
         long now = System.currentTimeMillis();
+        // 만료된 항목 정리 (맵 무한 증가 방지)
+        nextPinAttempts.entrySet().removeIf(e -> e.getValue() <= now);
         Long nextAttempt = nextPinAttempts.get(request.remoteAddress);
         if (nextAttempt != null && nextAttempt > now) {
             long retrySeconds = Math.max(

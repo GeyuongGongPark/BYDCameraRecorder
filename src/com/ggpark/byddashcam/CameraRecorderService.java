@@ -1092,6 +1092,13 @@ public final class CameraRecorderService extends Service
                 Log.d(TAG, "Auto-park suppressed: driving gear active");
                 return;
             }
+            // 기어 이벤트를 받은 적 있는데 P로 확인되지 않으면 차단
+            // (신호 대기/N 기어 등 속도=0이어도 실제 주차 아닌 상황)
+            if (t.rawGear != Integer.MIN_VALUE && !t.isGearP()) {
+                Log.d(TAG, "Auto-park suppressed: gear not P (raw=" + t.rawGear
+                        + " flags=0x" + Integer.toHexString(t.gearBlinkBeltFlags) + ")");
+                return;
+            }
         }
         Log.i(TAG, "Auto-switching to parking mode (speed=" + lastSpeedKmh + " km/h)");
         enterParkingMode();

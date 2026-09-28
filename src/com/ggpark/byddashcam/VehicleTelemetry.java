@@ -108,6 +108,11 @@ public final class VehicleTelemetry {
         return powerLevel >= 2 && powerLevel < 255;
     }
 
+    /** P 기어 상태인지 반환합니다. */
+    public boolean isGearP() {
+        return (gearBlinkBeltFlags & 0x01) != 0;
+    }
+
     /** 주행 기어(D/M/S) 또는 후진 기어(R) 상태인지 반환합니다. P/N이나 미확인이면 false. */
     public boolean isDriving() {
         return (gearBlinkBeltFlags & 0x0a) != 0; // bit1=R, bit3=D
