@@ -41,6 +41,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.webkit.WebView;
+import android.net.Uri;
 import android.util.Log;
 
 import java.io.File;
@@ -267,6 +268,7 @@ public final class MainActivity extends Activity
         Intent serviceIntent = new Intent(this, CameraRecorderService.class);
         startService(serviceIntent);
         bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE);
+        UpdateChecker.checkOnce(this, this::showUpdateDialog);
     }
 
     @Override
@@ -1795,6 +1797,20 @@ public final class MainActivity extends Activity
                         }),
                 toolbarButtonParams());
         return card;
+    }
+
+    private void showUpdateDialog(String tagName, String htmlUrl) {
+        ConfirmationDialog.show(
+                this,
+                "업데이트 사용 가능",
+                tagName + " 버전이 GitHub에 출시되었습니다.\n다운로드 페이지를 열까요?",
+                "다운로드",
+                ConfirmationDialog.Tone.DEFAULT,
+                () -> {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(htmlUrl)));
+                    } catch (Exception ignored) {}
+                });
     }
 
     private void showBackgroundAccessDialog(boolean automatic) {
