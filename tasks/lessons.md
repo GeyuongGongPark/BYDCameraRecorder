@@ -67,6 +67,27 @@
 - 인증 우회처럼 보이는 코드도 의도적 설계일 수 있음
 - 확신 없으면 수정 전에 물어볼 것
 
+## 로그 적재 원칙
+
+### LogBuffer vs Log.i
+- `Log.i`는 logcat에만 남음 — 차량에서 원격 확인 불가
+- `logBuffer.append()`는 `/api/debug/logs.txt`로 내려받기 가능 — **원격 디버깅의 핵심**
+- 차량 탑재 후 재현 어려운 이벤트는 반드시 logBuffer에도 기록
+
+### 현재 LogBuffer 태그 목록
+- `[Svc]` — `publishState()` 경유 모든 서비스 상태 변경
+- `[WakeUpMcu]` — MCU 웨이크업 결과 (ok / device null / unavailable)
+- `[BYDInit]` — 앱 시작 시 device 초기화 요약 (speed/gear/light/stat/energy/bodywork)
+- `[BYDRaw]` — 텔레메트리 값 변경마다 (speed/gearRaw/accel/brake/turn/light)
+- `[BYDGear]` — 기어 listener 최초 콜백 raw 내용
+- `[BYDGearErr]` — 기어 폴링 에러
+- `[BYDSpeed]` — 속도 listener 최초 콜백
+- `[BYDBodywork]` — bodywork Proxy/direct listener 최초 콜백
+
+### 새 기능 추가 시 체크
+- 원격으로 동작 여부를 확인해야 하는 기능 → logBuffer.append() 추가 필수
+- 최초 1회 확인용은 플래그(boolean) + `if (!flagged) { flagged=true; logBuffer.append(...); }` 패턴 사용
+
 ## ⚠️ CI 동기화 규칙 (위반 시 조용한 실패)
 
 ### 앱 코드와 build-release.yml은 반드시 같은 커밋에 업데이트

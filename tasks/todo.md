@@ -97,6 +97,24 @@
 - [ ] 회귀 테스트: 기존 녹화/세그먼트/잠금 기능 정상 동작 확인
 - [ ] 신호 대기 중 주차 전환 버그 수정 검증 (D 기어 + 정지 30초 이상)
 
+## Phase 10: 로그 적재 개선
+
+- [x] `CameraRecorderService.publishState()` → `logBuffer.append("Svc", ...)` 연동
+- [x] `wakeUpMcu()` 결과 → logBuffer 기록
+- [x] `VehicleDataProvider.initDevices()` 결과 요약 → logBuffer (`BYDInit` 태그)
+- [x] 기어/속도/bodywork listener 최초 콜백 수신 → logBuffer (`BYDGear`, `BYDSpeed`, `BYDBodywork` 태그)
+- [x] 빌드 통과
+
+### Phase 10 검토
+- `/api/debug/logs.txt`에서 이제 확인 가능한 항목:
+  - `[Svc]` — 모든 서비스 상태 변경 (주차 모드 진입/해제, 녹화 시작/중지, ACC 이벤트 등)
+  - `[WakeUpMcu]` — MCU 웨이크업 성공/실패
+  - `[BYDInit]` — 앱 시작 시 device 초기화 결과 요약 (speed/gear/light/stat/energy/bodywork ok or X)
+  - `[BYDGear]` — 기어 listener 최초 콜백 raw 내용
+  - `[BYDSpeed]` — 속도 listener 최초 콜백 raw 내용
+  - `[BYDBodywork]` — bodywork Proxy/direct listener 최초 콜백 수신 여부
+  - `[BYDRaw]` — 텔레메트리 값 변경 시마다 (기존)
+
 ## Phase 9: SentryEv 분석 후속 개선 3종
 
 - [x] `CameraRecorderService.java` — `wakeUpMcu()` 추가, `enterParkingMode()`에서 호출

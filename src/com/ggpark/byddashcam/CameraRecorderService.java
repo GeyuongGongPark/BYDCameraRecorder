@@ -248,11 +248,17 @@ public final class CameraRecorderService extends Service
                         "android.hardware.bydauto.special.BYDAutoSpecialDevice");
                 Object device = cls.getMethod("getInstance", Context.class)
                         .invoke(null, CameraRecorderService.this);
-                if (device == null) { Log.i(TAG, "WakeUpMcu: device null"); return; }
+                if (device == null) {
+                    Log.i(TAG, "WakeUpMcu: device null");
+                    logBuffer.append("WakeUpMcu", "device null");
+                    return;
+                }
                 cls.getMethod("wakeUpMcu").invoke(device);
                 Log.i(TAG, "WakeUpMcu: called successfully");
+                logBuffer.append("WakeUpMcu", "ok");
             } catch (Exception e) {
                 Log.i(TAG, "WakeUpMcu: unavailable (" + e.getClass().getSimpleName() + ")");
+                logBuffer.append("WakeUpMcu", "unavailable: " + e.getClass().getSimpleName());
             }
         }, "WakeUpMcu").start();
     }
@@ -2233,6 +2239,7 @@ public final class CameraRecorderService extends Service
 
     private void publishState(final String message) {
         Log.i(TAG, message);
+        logBuffer.append("Svc", message);
         lastStateMessage = message;
         uiStateVersion++;
         mainHandler.post(

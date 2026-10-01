@@ -87,11 +87,23 @@ public final class VehicleDataProvider {
         public void onPowerLevelChanged(int level) {
             Log.d(TAG, "Bodywork direct: onPowerLevelChanged(" + level + ")");
             if (level >= 0 && level <= 4) listenerPowerLevel = level;
+            if (!listenerBodyworkDirectFirstReceived) {
+                listenerBodyworkDirectFirstReceived = true;
+                LogBuffer buf = logBuffer;
+                if (buf != null) buf.append("BYDBodywork",
+                        "direct listener첫콜백: onPowerLevelChanged(" + level + ")");
+            }
         }
     }
 
     private boolean gearInvokeErrorLogged = false;
     private boolean gearNullLogged = false;
+
+    // listener 최초 콜백 수신 플래그 (리스너 연결 동작 여부 확인용)
+    private volatile boolean listenerGearFirstReceived = false;
+    private volatile boolean listenerSpeedFirstReceived = false;
+    private volatile boolean listenerBodyworkFirstReceived = false;
+    private volatile boolean listenerBodyworkDirectFirstReceived = false;
 
     // 첫 번째 폴에서는 무조건 콜백 발생
     private boolean isFirstPoll = true;
@@ -349,6 +361,13 @@ public final class VehicleDataProvider {
                         // 0~300 범위면 km/h로 직접 사용, 아니면 로그만
                         if (v >= 0 && v <= 300) listenerSpeedKmh = v;
                     }
+                    if (!listenerSpeedFirstReceived) {
+                        listenerSpeedFirstReceived = true;
+                        LogBuffer buf = logBuffer;
+                        if (buf != null) buf.append("BYDSpeed",
+                                "listener첫콜백: args[0]="
+                                + (args.length >= 1 ? args[0] : "none"));
+                    }
                 }
             });
         } catch (Exception e) {
@@ -402,6 +421,11 @@ public final class VehicleDataProvider {
                                     }
                                 } else if (args.length >= 1 && args[0] instanceof Number) {
                                     listenerGearValue = ((Number) args[0]).intValue();
+                                }
+                                if (!listenerGearFirstReceived) {
+                                    listenerGearFirstReceived = true;
+                                    LogBuffer buf = logBuffer;
+                                    if (buf != null) buf.append("BYDGear", "listener첫콜백: " + sb);
                                 }
                             } else if (name.equals("onDataChanged") && args != null
                                     && args.length >= 1) {
@@ -490,6 +514,13 @@ public final class VehicleDataProvider {
                         // powerLevel: 0=OFF, 1=ACC, 2=ON, 3=OK, 4=FAKE_OK
                         if (v >= 0 && v <= 4) listenerPowerLevel = v;
                     }
+                    if (!listenerBodyworkFirstReceived) {
+                        listenerBodyworkFirstReceived = true;
+                        LogBuffer buf = logBuffer;
+                        if (buf != null) buf.append("BYDBodywork",
+                                "Proxy listener첫콜백: args[0]="
+                                + (args.length >= 1 ? args[0] : "none"));
+                    }
                 }
             });
             // 직접 상속 방식 병행 등록 (Proxy vs 직접 상속 콜백 수신 비교)
@@ -505,6 +536,18 @@ public final class VehicleDataProvider {
         } catch (Exception e) {
             Throwable cause2 = (e instanceof java.lang.reflect.InvocationTargetException) ? e.getCause() : e;
             Log.w(TAG, "BYD bodywork device unavailable [" + (cause2 != null ? cause2.getClass().getSimpleName() : e.getClass().getSimpleName()) + "]: " + (cause2 != null ? cause2.getMessage() : e.getMessage()));
+        }
+
+        // 초기화 결과 요약 → LogBuffer
+        LogBuffer buf = logBuffer;
+        if (buf != null) {
+            buf.append("BYDInit",
+                    "speed=" + (speedDevice != null ? "ok" : "X")
+                    + " gear=" + (gearDevice != null ? "ok" : "X")
+                    + " light=" + (lightDevice != null ? "ok" : "X")
+                    + " stat=" + (statisticDevice != null ? "ok" : "X")
+                    + " energy=" + (energyDevice != null ? "ok" : "X")
+                    + " bodywork=" + (bodyworkDevice != null ? "ok" : "X"));
         }
     }
 
