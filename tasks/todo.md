@@ -97,6 +97,20 @@
 - [ ] 회귀 테스트: 기존 녹화/세그먼트/잠금 기능 정상 동작 확인
 - [ ] 신호 대기 중 주차 전환 버그 수정 검증 (D 기어 + 정지 30초 이상)
 
+## Phase 9: SentryEv 분석 후속 개선 3종
+
+- [x] `CameraRecorderService.java` — `wakeUpMcu()` 추가, `enterParkingMode()`에서 호출
+- [x] `ParkingGuardController.java` — `methodGetAllRadarDistance` + `getRadarStates()` 헬퍼 추출
+- [x] `VehicleDataProvider.java` — `BodyworkPowerLevelListener` inner class + 병행 등록
+- [x] 빌드 통과 확인
+
+### Phase 9 검토
+- 빌드 성공 (build/byd-dashcam-debug.apk)
+- 차량 설치 후 확인할 logcat 태그:
+  - `WakeUpMcu:` — 주차 모드 진입 시 MCU 웨이크업 성공/실패
+  - `BYD radar getAllRadarDistance available` — 메서드 존재 여부
+  - `Bodywork direct: onPowerLevelChanged` — 직접 상속 콜백 수신 여부
+
 ## 보안 검토 결과 (완료)
 - [x] `nextPinAttempts` 만료 항목 정리 추가 (`removeIf(e -> e.getValue() <= now)`)
 - [x] `api/debug/logs` 인증 없음 — **의도된 설계** (URL 토큰이 1차 보호), 되돌림

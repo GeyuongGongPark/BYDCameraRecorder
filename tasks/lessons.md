@@ -67,6 +67,25 @@
 - 인증 우회처럼 보이는 코드도 의도적 설계일 수 있음
 - 확신 없으면 수정 전에 물어볼 것
 
+## SentryEv 후속 개선 3종 (Phase 9)
+
+### `BYDAutoSpecialDevice.wakeUpMcu()`
+- `android.hardware.bydauto.special.BYDAutoSpecialDevice` reflection으로 접근
+- `getInstance(Context)` → `wakeUpMcu()` 순서로 호출
+- 주차 모드 진입 시 1회만 호출 (배터리 최소 소모 원칙)
+- 성공/실패 여부는 logcat `WakeUpMcu:` 태그로 확인 필요 (미확인)
+
+### `getAllRadarDistance()` fallback
+- `getAllRadarProbeStates()` 없는 차종용 fallback 추가
+- cm 단위 거리값 → 상태 변환: d≤0 or d≥150=SAFE, 100~149=GREEN, 50~99=YELLOW, <50=RED
+- `getRadarStates()` 헬퍼로 두 방식 통합 — `pollRadar()`는 헬퍼만 호출
+- 메서드 존재 여부: logcat `BYD radar getAllRadarDistance available` 확인 필요 (미확인)
+
+### `AbsBYDAutoBodyworkListener` 직접 상속 병행 등록
+- 기존 IBinder Proxy + 직접 상속 방식 동시 등록 (교체 아님)
+- `BodyworkPowerLevelListener extends AbsBYDAutoBodyworkListener` — `onPowerLevelChanged()` 오버라이드
+- 콜백 수신 여부: logcat `Bodywork direct: onPowerLevelChanged` vs `Bodywork onDataEventChanged` 비교 필요 (미확인)
+
 ## 빌드 환경
 
 ### 빌드 명령

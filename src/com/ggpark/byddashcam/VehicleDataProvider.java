@@ -3,6 +3,7 @@ package com.ggpark.byddashcam;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.hardware.bydauto.bodywork.AbsBYDAutoBodyworkListener;
 import android.util.Log;
 
 import java.io.IOException;
@@ -81,6 +82,14 @@ public final class VehicleDataProvider {
     private boolean anyDeviceAvailable;
 
     // gear 디버그 최초 1회 로그 플래그
+    private final class BodyworkPowerLevelListener extends AbsBYDAutoBodyworkListener {
+        @Override
+        public void onPowerLevelChanged(int level) {
+            Log.d(TAG, "Bodywork direct: onPowerLevelChanged(" + level + ")");
+            if (level >= 0 && level <= 4) listenerPowerLevel = level;
+        }
+    }
+
     private boolean gearInvokeErrorLogged = false;
     private boolean gearNullLogged = false;
 
@@ -483,6 +492,16 @@ public final class VehicleDataProvider {
                     }
                 }
             });
+            // 직접 상속 방식 병행 등록 (Proxy vs 직접 상속 콜백 수신 비교)
+            try {
+                Method regDirect = cls.getMethod("registerListener",
+                        AbsBYDAutoBodyworkListener.class);
+                regDirect.invoke(bodyworkDevice, new BodyworkPowerLevelListener());
+                Log.i(TAG, "BYD bodywork direct AbsBYDAutoBodyworkListener registered");
+            } catch (Exception e2) {
+                Log.i(TAG, "BYD bodywork direct listener unavailable ("
+                        + e2.getClass().getSimpleName() + ")");
+            }
         } catch (Exception e) {
             Throwable cause2 = (e instanceof java.lang.reflect.InvocationTargetException) ? e.getCause() : e;
             Log.w(TAG, "BYD bodywork device unavailable [" + (cause2 != null ? cause2.getClass().getSimpleName() : e.getClass().getSimpleName()) + "]: " + (cause2 != null ? cause2.getMessage() : e.getMessage()));

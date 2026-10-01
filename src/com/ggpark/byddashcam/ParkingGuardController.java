@@ -58,6 +58,7 @@ public final class ParkingGuardController {
     // 레이더 Reflection
     private Object radarDevice;
     private Method methodGetAllRadarProbeStates;
+    private Method methodGetAllRadarDistance;
     private ScheduledExecutorService radarExecutor;
     private volatile long radarDebounceUntilMs = 0L;
 
@@ -137,6 +138,10 @@ public final class ParkingGuardController {
             radarDevice = getInstance.invoke(null, context);
             methodGetAllRadarProbeStates = cls.getMethod("getAllRadarProbeStates");
             Log.i(TAG, "BYD radar device initialized");
+            try {
+                methodGetAllRadarDistance = cls.getMethod("getAllRadarDistance");
+                Log.i(TAG, "BYD radar getAllRadarDistance available");
+            } catch (NoSuchMethodException ignored) {}
         } catch (Exception e) {
             Log.w(TAG, "BYD radar device unavailable: " + e.getMessage());
         }
@@ -208,13 +213,36 @@ public final class ParkingGuardController {
         }
     }
 
+    private int[] getRadarStates() throws Exception {
+        if (methodGetAllRadarProbeStates != null) {
+            Object r = methodGetAllRadarProbeStates.invoke(radarDevice);
+            if (r instanceof int[]) return (int[]) r;
+        }
+        if (methodGetAllRadarDistance != null) {
+            Object r = methodGetAllRadarDistance.invoke(radarDevice);
+            if (r instanceof int[]) return distancesToStates((int[]) r);
+        }
+        return null;
+    }
+
+    private static int[] distancesToStates(int[] distances) {
+        int[] states = new int[distances.length];
+        for (int i = 0; i < distances.length; i++) {
+            int d = distances[i];
+            if (d <= 0 || d >= 150) states[i] = 1;  // SAFE
+            else if (d >= 100)       states[i] = 2;  // GREEN
+            else if (d >= 50)        states[i] = 3;  // YELLOW
+            else                     states[i] = 4;  // RED
+        }
+        return states;
+    }
+
     private void pollRadar() {
         if (radarDevice == null) return;
         if (System.currentTimeMillis() < radarDebounceUntilMs) return;
         try {
-            Object result = methodGetAllRadarProbeStates.invoke(radarDevice);
-            if (!(result instanceof int[])) return;
-            int[] states = (int[]) result;
+            int[] states = getRadarStates();
+            if (states == null) return;
 
             // 레이더 트리거 녹화 중: ALL SAFE이면 녹화 중지
             if (state == State.RECORDING && lastTrigger == TriggerType.RADAR) {

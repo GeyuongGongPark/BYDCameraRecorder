@@ -241,6 +241,22 @@ public final class CameraRecorderService extends Service
         registerAccWhitelist();
     }
 
+    private void wakeUpMcu() {
+        new Thread(() -> {
+            try {
+                Class<?> cls = Class.forName(
+                        "android.hardware.bydauto.special.BYDAutoSpecialDevice");
+                Object device = cls.getMethod("getInstance", Context.class)
+                        .invoke(null, CameraRecorderService.this);
+                if (device == null) { Log.i(TAG, "WakeUpMcu: device null"); return; }
+                cls.getMethod("wakeUpMcu").invoke(device);
+                Log.i(TAG, "WakeUpMcu: called successfully");
+            } catch (Exception e) {
+                Log.i(TAG, "WakeUpMcu: unavailable (" + e.getClass().getSimpleName() + ")");
+            }
+        }, "WakeUpMcu").start();
+    }
+
     private void registerAccWhitelist() {
         new Thread(() -> {
             String[] names = {"accmodemanager", "acc_mode_manager", "AccModeManager"};
@@ -1277,6 +1293,7 @@ public final class CameraRecorderService extends Service
                     }
                 });
         parkingGuardController.start(parkingSettings);
+        wakeUpMcu();
         acquireWakeLock();
         enterForeground();
         publishState("주차 감시 시작 - 충격 감지 대기");
