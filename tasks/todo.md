@@ -82,6 +82,15 @@
   - bodywork args[0]이 powerLevel(0-4)인지, 아니면 다른 이벤트 타입인지 확인
   - 확인 후 매핑 조정 (VehicleDataProvider.java listenerSpeedKmh / listenerPowerLevel)
 
+## Phase 8: ACC OFF 생존 안정성 강화
+
+- [x] `AndroidManifest.xml` — ACC/IGN broadcast 인텐트 필터 추가 (ACC_ON, ACC_OFF, IGN_ON, ACC_MODE_CHANGED)
+- [x] `RecorderStartup.java` — `isStartupAction()`에 ACC 액션 4개 추가
+- [x] `CameraRecorderService.java` — `onCreate()` 끝에 `registerAccWhitelist()` 추가 (별도 스레드, graceful degradation)
+- [ ] 차량 설치 후 `AccWhitelist:` 로그 확인
+- [ ] ACC OFF 후 브로드캐스트 수신 로그 확인
+- [ ] 주차 감시 모드 유지 여부 실차 검증
+
 ## 검증
 - [ ] 에뮬레이터에서 동작 확인
 - [ ] 실제 차량(Atto 3) 탑재 테스트 — 기어 raw 값 확인 후 P/R/N/D 매핑 검증

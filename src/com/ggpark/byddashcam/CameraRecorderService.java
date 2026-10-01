@@ -238,6 +238,43 @@ public final class CameraRecorderService extends Service
         systemMonitor = new SystemMonitor();
         initCloudflaredTunnel(initialSettings);
         startSegmentRecoveryLoop();
+        registerAccWhitelist();
+    }
+
+    private void registerAccWhitelist() {
+        new Thread(() -> {
+            String[] names = {"accmodemanager", "acc_mode_manager", "AccModeManager"};
+            try {
+                Class<?> smCls = Class.forName("android.os.ServiceManager");
+                android.os.IBinder binder = null;
+                for (String name : names) {
+                    Object b = smCls.getMethod("getService", String.class).invoke(null, name);
+                    if (b instanceof android.os.IBinder) { binder = (android.os.IBinder) b; break; }
+                }
+                if (binder == null) { Log.i(TAG, "AccWhitelist: service not found"); return; }
+
+                String pkg = getPackageName();
+                for (int code = 1; code <= 10; code++) {
+                    android.os.Parcel data = android.os.Parcel.obtain();
+                    android.os.Parcel reply = android.os.Parcel.obtain();
+                    try {
+                        data.writeInterfaceToken("android.os.IAccModeManager");
+                        data.writeString(pkg);
+                        if (binder.transact(code, data, reply, 0)) {
+                            Log.i(TAG, "AccWhitelist: registered via transact code=" + code);
+                            return;
+                        }
+                    } catch (Exception ignored) {
+                    } finally {
+                        data.recycle();
+                        reply.recycle();
+                    }
+                }
+                Log.i(TAG, "AccWhitelist: all transact codes failed (ACC OFF kill not prevented by OS)");
+            } catch (Exception e) {
+                Log.i(TAG, "AccWhitelist: unavailable (" + e.getClass().getSimpleName() + ")");
+            }
+        }, "AccWhitelistReg").start();
     }
 
     /**

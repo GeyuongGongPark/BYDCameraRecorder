@@ -76,6 +76,10 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.ggpark.byddashcam.action.STARTUP_WATCHDOG" />
+                <action android:name="com.byd.action.ACC_ON" />
+                <action android:name="com.byd.action.ACC_OFF" />
+                <action android:name="com.byd.action.IGN_ON" />
+                <action android:name="com.bydaccmode.ACC_MODE_CHANGED" />
             </intent-filter>
         </receiver>
 

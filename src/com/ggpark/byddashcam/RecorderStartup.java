@@ -33,7 +33,11 @@ public final class RecorderStartup {
                 || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)
                 || "android.intent.action.QUICKBOOT_POWERON".equals(action)
                 || "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)
-                || ACTION_WATCHDOG.equals(action);
+                || ACTION_WATCHDOG.equals(action)
+                || "com.byd.action.ACC_ON".equals(action)
+                || "com.byd.action.ACC_OFF".equals(action)
+                || "com.byd.action.IGN_ON".equals(action)
+                || "com.bydaccmode.ACC_MODE_CHANGED".equals(action);
     }
 
     public static void scheduleFallbacks(Context context, String reason) {
