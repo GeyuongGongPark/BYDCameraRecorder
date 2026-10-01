@@ -67,6 +67,30 @@
 - 인증 우회처럼 보이는 코드도 의도적 설계일 수 있음
 - 확신 없으면 수정 전에 물어볼 것
 
+## ⚠️ CI 동기화 규칙 (위반 시 조용한 실패)
+
+### 앱 코드와 build-release.yml은 반드시 같은 커밋에 업데이트
+
+- 새 환경변수·BuildConfig 필드·외부 API 키를 앱에 추가할 때
+  → `.github/workflows/build-release.yml`에도 해당 secret 주입을 **같은 커밋**에 추가
+- 누락 시: CI 빌드 APK에 빈 값이 들어가 조용히 실패 (사용자도 서버도 오류 인식 불가)
+- 실제 사례: PushRegistrar 추가 시 PUSH_API_KEY 누락 → 8월 이후 모든 CI 빌드 토큰 등록 실패
+
+### todo.md 체크리스트에 항상 포함
+```
+- [ ] build-release.yml에 관련 secret/env 추가
+```
+
+### 현재 CI 파일 위치
+`.github/workflows/build-release.yml` (release.yml 아님)
+
+### CI Release 구조
+- tag `v*` push 시 트리거
+- 차량 APK: `BYD-BlackBox-Car-{tag}.apk`
+- 폰앱 APK: `BYD-BlackBox-Phone-{tag}.apk`
+- GitHub Release assets로 두 파일 첨부
+- UpdateChecker는 `Phone` 미포함 `.apk`를 차량용으로 선택
+
 ## SentryEv 후속 개선 3종 (Phase 9)
 
 ### `BYDAutoSpecialDevice.wakeUpMcu()`

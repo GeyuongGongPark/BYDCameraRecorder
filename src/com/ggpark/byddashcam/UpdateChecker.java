@@ -68,14 +68,14 @@ public final class UpdateChecker {
                 String htmlUrl = json.optString("html_url", "");
                 if (tagName.isEmpty()) return;
 
-                // assets에서 APK 다운로드 URL 추출
+                // assets에서 차량용 APK 다운로드 URL 추출 (Car APK 우선, Phone APK 제외)
                 String apkUrl = "";
                 JSONArray assets = json.optJSONArray("assets");
                 if (assets != null) {
                     for (int i = 0; i < assets.length(); i++) {
                         JSONObject asset = assets.getJSONObject(i);
                         String name = asset.optString("name", "");
-                        if (name.endsWith(".apk")) {
+                        if (name.endsWith(".apk") && !name.contains("Phone")) {
                             apkUrl = asset.optString("browser_download_url", "");
                             break;
                         }
