@@ -1,5 +1,7 @@
 # BYD Camera Recorder
 
+[English version available → README.en.md](README.en.md)
+
 BYD 차량의 내장 AVM 카메라를 활용한 안드로이드 블랙박스 앱입니다.
 
 ## 기능
