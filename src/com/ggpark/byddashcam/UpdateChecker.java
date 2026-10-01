@@ -7,6 +7,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.InputStream;
@@ -23,7 +24,8 @@ import java.util.Scanner;
  */
 public final class UpdateChecker {
     public interface Callback {
-        void onUpdateAvailable(String tagName, String htmlUrl);
+        /** apkUrl: assets에 APK가 있으면 직접 다운로드 URL, 없으면 빈 문자열 */
+        void onUpdateAvailable(String tagName, String htmlUrl, String apkUrl);
     }
 
     private static final String TAG = "BYDCamera";
@@ -66,6 +68,20 @@ public final class UpdateChecker {
                 String htmlUrl = json.optString("html_url", "");
                 if (tagName.isEmpty()) return;
 
+                // assets에서 APK 다운로드 URL 추출
+                String apkUrl = "";
+                JSONArray assets = json.optJSONArray("assets");
+                if (assets != null) {
+                    for (int i = 0; i < assets.length(); i++) {
+                        JSONObject asset = assets.getJSONObject(i);
+                        String name = asset.optString("name", "");
+                        if (name.endsWith(".apk")) {
+                            apkUrl = asset.optString("browser_download_url", "");
+                            break;
+                        }
+                    }
+                }
+
                 // 현재 versionName과 비교 (v 접두사 무시)
                 PackageInfo info = context.getPackageManager()
                         .getPackageInfo(context.getPackageName(), 0);
@@ -77,8 +93,10 @@ public final class UpdateChecker {
                 }
 
                 Log.i(TAG, "UpdateChecker: new version available — " + tagName
-                        + " (current=" + current + ")");
-                new Handler(Looper.getMainLooper()).post(() -> callback.onUpdateAvailable(tagName, htmlUrl));
+                        + " (current=" + current + ", apkUrl=" + (!apkUrl.isEmpty() ? "yes" : "none") + ")");
+                final String finalApkUrl = apkUrl;
+                new Handler(Looper.getMainLooper()).post(
+                        () -> callback.onUpdateAvailable(tagName, htmlUrl, finalApkUrl));
             } catch (Exception e) {
                 Log.i(TAG, "UpdateChecker: check failed (" + e.getClass().getSimpleName() + ")");
             }

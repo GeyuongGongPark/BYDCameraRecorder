@@ -41,7 +41,11 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.webkit.WebView;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
 import android.net.Uri;
+import android.os.Environment;
 import android.util.Log;
 
 import java.io.File;
@@ -268,7 +272,7 @@ public final class MainActivity extends Activity
         Intent serviceIntent = new Intent(this, CameraRecorderService.class);
         startService(serviceIntent);
         bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE);
-        UpdateChecker.checkOnce(this, this::showUpdateDialog);
+        UpdateChecker.checkOnce(this, (tag, html, apk) -> showUpdateDialog(tag, html, apk));
     }
 
     @Override
@@ -1799,18 +1803,57 @@ public final class MainActivity extends Activity
         return card;
     }
 
-    private void showUpdateDialog(String tagName, String htmlUrl) {
+    private void showUpdateDialog(String tagName, String htmlUrl, String apkUrl) {
+        boolean hasApk = !apkUrl.isEmpty();
+        String message = tagName + " 버전이 GitHub에 출시되었습니다.\n"
+                + (hasApk ? "백그라운드에서 APK를 다운로드 후 설치합니다."
+                          : "다운로드 페이지를 열까요?");
         ConfirmationDialog.show(
                 this,
                 "업데이트 사용 가능",
-                tagName + " 버전이 GitHub에 출시되었습니다.\n다운로드 페이지를 열까요?",
-                "다운로드",
+                message,
+                hasApk ? "설치" : "다운로드",
                 ConfirmationDialog.Tone.DEFAULT,
                 () -> {
-                    try {
-                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(htmlUrl)));
-                    } catch (Exception ignored) {}
+                    if (hasApk) {
+                        downloadAndInstallUpdate(tagName, apkUrl);
+                    } else {
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(htmlUrl)));
+                        } catch (Exception ignored) {}
+                    }
                 });
+    }
+
+    private void downloadAndInstallUpdate(String tagName, String apkUrl) {
+        Toast.makeText(this, tagName + " 다운로드 중...", Toast.LENGTH_SHORT).show();
+        DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+        DownloadManager.Request req = new DownloadManager.Request(Uri.parse(apkUrl))
+                .setTitle("BYD 블랙박스 업데이트 " + tagName)
+                .setDescription("다운로드 완료 후 설치 화면이 표시됩니다")
+                .setDestinationInExternalPublicDir(
+                        Environment.DIRECTORY_DOWNLOADS, "byd-dashcam-update.apk")
+                .setMimeType("application/vnd.android.package-archive")
+                .setNotificationVisibility(
+                        DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        long downloadId = dm.enqueue(req);
+
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context ctx, Intent intent) {
+                long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                if (id != downloadId) return;
+                try { unregisterReceiver(this); } catch (Exception ignored) {}
+                Uri fileUri = dm.getUriForDownloadedFile(downloadId);
+                if (fileUri == null) return;
+                Intent install = new Intent(Intent.ACTION_VIEW);
+                install.setDataAndType(fileUri, "application/vnd.android.package-archive");
+                install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_ACTIVITY_NEW_TASK);
+                try { startActivity(install); } catch (Exception ignored) {}
+            }
+        };
+        registerReceiver(receiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
     }
 
     private void showBackgroundAccessDialog(boolean automatic) {
