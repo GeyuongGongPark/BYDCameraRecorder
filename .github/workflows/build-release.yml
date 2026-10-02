@@ -28,6 +28,11 @@ jobs:
         run: npm --prefix phone-ui ci && npm --prefix phone-ui run build
 
       # ── 차량용 Android APK ─────────────────────────────────────────────
+      - name: Restore debug keystore
+        run: |
+          mkdir -p build
+          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > build/debug.keystore
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
