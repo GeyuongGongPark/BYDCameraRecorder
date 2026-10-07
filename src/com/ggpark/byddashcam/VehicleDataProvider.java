@@ -46,7 +46,9 @@ public final class VehicleDataProvider {
     private Method methodGetBrakeDeepness;
 
     private Object gearDevice;
-    private Method methodGetGearboxAutoModeType;
+    private Method methodGetGear;          // getCurrentGear (D3), getGear (D5), or getGearboxAutoModeType fallback
+    private boolean gearIsD3 = false;      // D3(돌핀) 기어 매핑: 0=N, 1=R, 2=D, 3=P
+    private boolean gearIsD5 = false;      // D5(씨라이언7) 기어 매핑: 1=P, 2=R, 3=N, 4=D
     // 리스너 방식으로 받은 값 (registerListener permission 체크 없음)
     private volatile int listenerGearValue = Integer.MIN_VALUE;
     private volatile int listenerSpeedKmh = Integer.MIN_VALUE;   // 속도 리스너 값
@@ -355,10 +357,18 @@ public final class VehicleDataProvider {
             Log.i(TAG, "BYD speed device initialized");
             // 속도 리스너 등록 (permission 체크 없음 — 기어와 동일한 방식)
             tryRegisterListener(cls, speedDevice, "Speed", new ListenerCallback() {
+                // 개발 노트 확인: args[0]=featureId(874512392), args[1]=속도(km/h)
+                private static final int SPEED_FEATURE_ID = 874512392;
                 @Override public void onDataEvent(String tag, Object[] args) {
-                    if (args.length >= 1 && args[0] instanceof Number) {
+                    // featureId 필터: args[0]이 SPEED_FEATURE_ID인 경우만 처리
+                    if (args.length >= 2 && args[0] instanceof Number
+                            && ((Number) args[0]).intValue() == SPEED_FEATURE_ID
+                            && args[1] instanceof Number) {
+                        int v = ((Number) args[1]).intValue();
+                        if (v >= 0 && v <= 300) listenerSpeedKmh = v;
+                    } else if (args.length >= 1 && args[0] instanceof Number) {
+                        // featureId 필터 없는 경우 fallback (args[0]이 직접 속도인 구형 방식)
                         int v = ((Number) args[0]).intValue();
-                        // 0~300 범위면 km/h로 직접 사용, 아니면 로그만
                         if (v >= 0 && v <= 300) listenerSpeedKmh = v;
                     }
                     if (!listenerSpeedFirstReceived) {
@@ -366,7 +376,9 @@ public final class VehicleDataProvider {
                         LogBuffer buf = logBuffer;
                         if (buf != null) buf.append("BYDSpeed",
                                 "listener첫콜백: args[0]="
-                                + (args.length >= 1 ? args[0] : "none"));
+                                + (args.length >= 1 ? args[0] : "none")
+                                + " args[1]="
+                                + (args.length >= 2 ? args[1] : "none"));
                     }
                 }
             });
@@ -380,7 +392,23 @@ public final class VehicleDataProvider {
             Class<?> cls = loadBydClass("android.hardware.bydauto.gearbox.BYDAutoGearboxDevice");
             gearDevice = getDeviceInstance(cls, context);
             if (gearDevice == null) throw new RuntimeException("getInstance() returned null");
-            methodGetGearboxAutoModeType = cls.getMethod("getGearboxAutoModeType");
+            // D3(돌핀): getCurrentGear() → 매핑 0=N, 1=R, 2=D, 3=P
+            // D5(씨라이언7): getGear() → 매핑 1=P, 2=R, 3=N, 4=D
+            // fallback: getGearboxAutoModeType() → 기존 API 매핑 1=P,2=R,3=N,4=D
+            try {
+                methodGetGear = cls.getMethod("getCurrentGear");
+                gearIsD3 = true;
+                Log.i(TAG, "BYD gear method: getCurrentGear (D3 매핑)");
+            } catch (NoSuchMethodException ignored) {
+                try {
+                    methodGetGear = cls.getMethod("getGear");
+                    gearIsD5 = true;
+                    Log.i(TAG, "BYD gear method: getGear (D5 매핑)");
+                } catch (NoSuchMethodException ignored2) {
+                    methodGetGear = cls.getMethod("getGearboxAutoModeType");
+                    Log.i(TAG, "BYD gear method: getGearboxAutoModeType (기존 API)");
+                }
+            }
             // 리스너 방식으로 기어 이벤트 수신 시도 (권한 우회 가능성 테스트)
             // IBYDAutoListener는 인터페이스이므로 Proxy 사용 가능
             try {
@@ -410,15 +438,9 @@ public final class VehicleDataProvider {
                                 }
                                 sb.append(")");
                                 Log.d(TAG, sb.toString());
-                                // args[0]=channelId/rawValue, args[1]=API 기어 타입(1-6) 시도
+                                // 개발 노트: args[0]=featureId, args[1]=기어값
                                 if (args.length >= 2 && args[1] instanceof Number) {
-                                    int v = ((Number) args[1]).intValue();
-                                    // API 기준 기어 타입(1=P,2=R,3=N,4=D,5=M,6=S)이면 직접 사용
-                                    if (v >= 1 && v <= 6) {
-                                        listenerGearValue = v;
-                                    } else {
-                                        listenerGearValue = ((Number) args[0]).intValue();
-                                    }
+                                    listenerGearValue = ((Number) args[1]).intValue();
                                 } else if (args.length >= 1 && args[0] instanceof Number) {
                                     listenerGearValue = ((Number) args[0]).intValue();
                                 }
@@ -658,21 +680,9 @@ public final class VehicleDataProvider {
                 }
             } else {
                 try {
-                    Object v = methodGetGearboxAutoModeType.invoke(gearDevice);
+                    Object v = methodGetGear.invoke(gearDevice);
                     if (v instanceof Number) {
-                        int g = ((Number) v).intValue();
-                        rawGearValue = g;
-                        // API 문서 기준 기어 매핑:
-                        // GEARBOX_AUTO_MODE_P=1, R=2, N=3, D=4, M=5, S=6
-                        if (g == 1) {
-                            gearBlinkBeltFlags |= 0x01; // P
-                        } else if (g == 2) {
-                            gearBlinkBeltFlags |= 0x02; // R
-                        } else if (g == 3) {
-                            gearBlinkBeltFlags |= 0x04; // N
-                        } else if (g == 4 || g == 5 || g == 6) {
-                            gearBlinkBeltFlags |= 0x08; // D (M/S 포함)
-                        }
+                        rawGearValue = ((Number) v).intValue();
                     }
                 } catch (Exception e) {
                     if (!gearInvokeErrorLogged) {
@@ -686,12 +696,10 @@ public final class VehicleDataProvider {
                     }
                     // 폴링 실패 시 리스너에서 받은 최후 값 사용
                     int lv = listenerGearValue;
-                    if (lv != Integer.MIN_VALUE) {
-                        rawGearValue = lv;
-                    }
+                    if (lv != Integer.MIN_VALUE) rawGearValue = lv;
                 }
             }
-            // getGearboxAutoModeType 실패해도 리스너 값으로 보완
+            // 폴링 실패해도 리스너 값으로 보완
             if (rawGearValue == Integer.MIN_VALUE) {
                 int lv = listenerGearValue;
                 if (lv != Integer.MIN_VALUE) rawGearValue = lv;
@@ -699,13 +707,28 @@ public final class VehicleDataProvider {
             if (rawGearValue != Integer.MIN_VALUE) {
                 int g = rawGearValue;
                 gearBlinkBeltFlags = 0;
-                if (g == 1) gearBlinkBeltFlags |= 0x01;                 // P (API)
-                else if (g == 2) gearBlinkBeltFlags |= 0x02;            // R (API)
-                else if (g == 3) gearBlinkBeltFlags |= 0x04;            // N (API)
-                else if (g == 4 || g == 5 || g == 6) gearBlinkBeltFlags |= 0x08; // D/M/S (API)
-                // 관찰된 raw CAN 값 매핑 (args[1]이 API 타입 아닌 경우 fallback)
-                else if (g == 555) gearBlinkBeltFlags |= 0x01;          // raw P
-                else if (g == 629) gearBlinkBeltFlags |= 0x08;          // raw D
+                if (gearIsD3) {
+                    // D3(돌핀) getCurrentGear() 매핑: 0=N, 1=R, 2=D, 3=P
+                    if (g == 3)      gearBlinkBeltFlags |= 0x01; // P
+                    else if (g == 1) gearBlinkBeltFlags |= 0x02; // R
+                    else if (g == 0) gearBlinkBeltFlags |= 0x04; // N
+                    else if (g == 2) gearBlinkBeltFlags |= 0x08; // D
+                } else if (gearIsD5) {
+                    // D5(씨라이언7) getGear() 매핑: 1=P, 2=R, 3=N, 4=D
+                    if (g == 1)      gearBlinkBeltFlags |= 0x01; // P
+                    else if (g == 2) gearBlinkBeltFlags |= 0x02; // R
+                    else if (g == 3) gearBlinkBeltFlags |= 0x04; // N
+                    else if (g == 4 || g == 5 || g == 6) gearBlinkBeltFlags |= 0x08; // D/M/S
+                } else {
+                    // getGearboxAutoModeType() fallback 매핑: 1=P, 2=R, 3=N, 4=D
+                    if (g == 1)      gearBlinkBeltFlags |= 0x01; // P
+                    else if (g == 2) gearBlinkBeltFlags |= 0x02; // R
+                    else if (g == 3) gearBlinkBeltFlags |= 0x04; // N
+                    else if (g == 4 || g == 5 || g == 6) gearBlinkBeltFlags |= 0x08; // D/M/S
+                    // 관찰된 raw CAN 값 (이전 테스트 결과 보존)
+                    else if (g == 555) gearBlinkBeltFlags |= 0x01; // raw P
+                    else if (g == 629) gearBlinkBeltFlags |= 0x08; // raw D
+                }
             }
 
             int lightFlags = 0;
@@ -716,11 +739,13 @@ public final class VehicleDataProvider {
                         Object v = methodGetTurnLightFlashState.invoke(lightDevice);
                         if (v instanceof Number) {
                             int state = ((Number) v).intValue();
-                            // BeetleLauncher 확인: 2/3=left, 4/5=right
-                            if (state == 2 || state == 3) {
+                            // 개발 노트(실차 확인): 1=꺼짐, 2=좌, 4=우, 6=비상등
+                            if (state == 2) {
                                 gearBlinkBeltFlags |= (1 << 4); // 좌회전
-                            } else if (state == 4 || state == 5) {
+                            } else if (state == 4) {
                                 gearBlinkBeltFlags |= (1 << 5); // 우회전
+                            } else if (state == 6) {
+                                gearBlinkBeltFlags |= (1 << 4) | (1 << 5); // 비상등(양쪽)
                             }
                         }
                     } catch (Exception ignored) {
