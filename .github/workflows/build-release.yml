@@ -43,6 +43,7 @@ jobs:
         run: ./build.sh
         env:
           BYD_CAMERA_SIGNING_MODE: debug
+          BYD_APP_VERSION: ${{ github.ref_name }}
 
       - name: Rename car APK
         run: cp build/byd-dashcam-debug.apk build/BYD-BlackBox-Car-${{ github.ref_name }}.apk

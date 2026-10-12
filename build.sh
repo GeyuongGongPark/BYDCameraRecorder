@@ -99,6 +99,29 @@ esac
 
 mkdir -p "${build_dir}" "${generated_dir}" "${stub_classes}" "${app_classes}"
 
+# --------------------------------------------------------------------------
+# 버전 자동 주입: BYD_APP_VERSION 환경변수 > 현재 커밋의 git tag
+# 태그 없는 로컬 빌드는 AndroidManifest.xml 현재 값 그대로 사용
+# --------------------------------------------------------------------------
+if [[ -n "${BYD_APP_VERSION:-}" ]]; then
+    app_version="${BYD_APP_VERSION#v}"   # v1.0.8 → 1.0.8
+elif git -C "${project_root}" describe --tags --exact-match HEAD 2>/dev/null | grep -q .; then
+    git_tag="$(git -C "${project_root}" describe --tags --exact-match HEAD 2>/dev/null)"
+    app_version="${git_tag#v}"
+else
+    app_version=""
+fi
+
+manifest_src="${project_root}/AndroidManifest.xml"
+if [[ -n "${app_version}" ]]; then
+    manifest_to_use="${build_dir}/AndroidManifest.xml"
+    sed "s/android:versionName=\"[^\"]*\"/android:versionName=\"${app_version}\"/" \
+        "${manifest_src}" > "${manifest_to_use}"
+    printf 'versionName: %s\n' "${app_version}"
+else
+    manifest_to_use="${manifest_src}"
+fi
+
 if [[ ! -f "${vendor_jar}" ]]; then
     printf 'Missing vendor API jar: %s\n' "${vendor_jar}" >&2
     exit 1
@@ -121,7 +144,7 @@ fi
 aapt package \
     -f \
     -m \
-    -M "${project_root}/AndroidManifest.xml" \
+    -M "${manifest_to_use}" \
     -S "${project_root}/res" \
     -A "${project_root}/assets" \
     -I "${android_jar}" \
