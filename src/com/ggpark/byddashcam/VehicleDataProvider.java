@@ -708,11 +708,12 @@ public final class VehicleDataProvider {
                 int g = rawGearValue;
                 gearBlinkBeltFlags = 0;
                 if (gearIsD3) {
-                    // D3(돌핀) getCurrentGear() 매핑: 0=N, 1=R, 2=D, 3=P
-                    if (g == 3)      gearBlinkBeltFlags |= 0x01; // P
-                    else if (g == 1) gearBlinkBeltFlags |= 0x02; // R
-                    else if (g == 0) gearBlinkBeltFlags |= 0x04; // N
-                    else if (g == 2) gearBlinkBeltFlags |= 0x08; // D
+                    // D3(돌핀/아토3) getCurrentGear() 매핑: 0=N, 1=R, 2=D, 3=P
+                    // 게터 실패 시 리스너 raw CAN 값(555=P, 629=D)으로 fallback
+                    if (g == 3 || g == 555)       gearBlinkBeltFlags |= 0x01; // P
+                    else if (g == 1)               gearBlinkBeltFlags |= 0x02; // R
+                    else if (g == 0)               gearBlinkBeltFlags |= 0x04; // N
+                    else if (g == 2 || g == 629)   gearBlinkBeltFlags |= 0x08; // D
                 } else if (gearIsD5) {
                     // D5(씨라이언7) getGear() 매핑: 1=P, 2=R, 3=N, 4=D
                     if (g == 1)      gearBlinkBeltFlags |= 0x01; // P
