@@ -131,6 +131,32 @@
 - `BodyworkPowerLevelListener extends AbsBYDAutoBodyworkListener` — `onPowerLevelChanged()` 오버라이드
 - 콜백 수신 여부: logcat `Bodywork direct: onPowerLevelChanged` vs `Bodywork onDataEventChanged` 비교 필요 (미확인)
 
+## BYD 리스너 콜백 구조 (실차 로그 확인)
+
+### onDataEventChanged 파라미터 타입
+- args[0] = Integer (featureId)
+- args[1] = BYDAutoEventValue 객체 (Number가 아님!)
+- `args[1] instanceof Number` 체크는 항상 false → BYDAutoEventValue.intValue 필드 reflection으로 추출
+- 개발 노트의 `args[1].intValue()`는 필드 접근 표현 (메서드 아님)
+
+### BYDAutoEventValue 필드 추출
+```java
+Field f = obj.getClass().getField("intValue"); // 또는 getDeclaredField
+Object v = f.get(obj);
+int value = ((Number) v).intValue();
+```
+
+### 기어 featureId 패턴 (아토3 D3, 실차 관찰)
+- 692060194, 555745336 교대로 나옴 — featureId가 기어 종류마다 다를 수 있음
+- BYDAutoEventValue.intValue에서 실제 기어값(0=N, 1=R, 2=D, 3=P?) 확인 필요
+- **TODO**: 실차에서 P/D/N/R 전환 시 intValue 값 확인
+
+### AndroidManifest.xml versionName 관리
+- versionName은 항상 GitHub 태그와 일치시킬 것
+- 불일치 시 UpdateChecker가 매번 업데이트 알림 표시
+- 현재 기준: versionCode=18, versionName="1.0.8"
+- 다음 릴리스 전에 반드시 versionName 업데이트 + 커밋
+
 ## 빌드 환경
 
 ### 빌드 명령

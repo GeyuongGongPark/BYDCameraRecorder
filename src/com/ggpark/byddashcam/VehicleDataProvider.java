@@ -317,6 +317,26 @@ public final class VehicleDataProvider {
         }
     }
 
+    /**
+     * BYDAutoEventValue 객체에서 int 값을 추출합니다.
+     * args[1]이 Number이면 직접 사용, BYDAutoEventValue이면 intValue 필드 reflection으로 접근.
+     */
+    private static Integer extractEventInt(Object obj) {
+        if (obj instanceof Number) return ((Number) obj).intValue();
+        if (obj == null) return null;
+        try {
+            java.lang.reflect.Field f;
+            try { f = obj.getClass().getField("intValue"); }
+            catch (NoSuchFieldException e) {
+                f = obj.getClass().getDeclaredField("intValue");
+                f.setAccessible(true);
+            }
+            Object v = f.get(obj);
+            if (v instanceof Number) return ((Number) v).intValue();
+        } catch (Exception ignored) {}
+        return null;
+    }
+
     private Class<?> loadBydClass(String fqn) throws ClassNotFoundException {
         if (bydClassLoader != null) {
             return Class.forName(fqn, true, bydClassLoader);
@@ -360,14 +380,12 @@ public final class VehicleDataProvider {
                 // 개발 노트 확인: args[0]=featureId(874512392), args[1]=속도(km/h)
                 private static final int SPEED_FEATURE_ID = 874512392;
                 @Override public void onDataEvent(String tag, Object[] args) {
-                    // featureId 필터: args[0]이 SPEED_FEATURE_ID인 경우만 처리
+                    // args[0]=featureId, args[1]=BYDAutoEventValue (또는 Number)
                     if (args.length >= 2 && args[0] instanceof Number
-                            && ((Number) args[0]).intValue() == SPEED_FEATURE_ID
-                            && args[1] instanceof Number) {
-                        int v = ((Number) args[1]).intValue();
-                        if (v >= 0 && v <= 300) listenerSpeedKmh = v;
+                            && ((Number) args[0]).intValue() == SPEED_FEATURE_ID) {
+                        Integer v = extractEventInt(args[1]);
+                        if (v != null && v >= 0 && v <= 300) listenerSpeedKmh = v;
                     } else if (args.length >= 1 && args[0] instanceof Number) {
-                        // featureId 필터 없는 경우 fallback (args[0]이 직접 속도인 구형 방식)
                         int v = ((Number) args[0]).intValue();
                         if (v >= 0 && v <= 300) listenerSpeedKmh = v;
                     }
@@ -438,9 +456,12 @@ public final class VehicleDataProvider {
                                 }
                                 sb.append(")");
                                 Log.d(TAG, sb.toString());
-                                // 개발 노트: args[0]=featureId, args[1]=기어값
-                                if (args.length >= 2 && args[1] instanceof Number) {
-                                    listenerGearValue = ((Number) args[1]).intValue();
+                                // args[0]=featureId(Integer), args[1]=BYDAutoEventValue
+                                // BYDAutoEventValue.intValue 필드에서 실제 기어값 추출
+                                Integer extracted = args.length >= 2
+                                        ? extractEventInt(args[1]) : null;
+                                if (extracted != null) {
+                                    listenerGearValue = extracted;
                                 } else if (args.length >= 1 && args[0] instanceof Number) {
                                     listenerGearValue = ((Number) args[0]).intValue();
                                 }

@@ -74,13 +74,13 @@
   - 원인: speed/powerLevel API 차단(signature 권한) → 시동/기어 모두 판단 불가
   - 수정: `tryAutoPark()`에 `rawGear != MIN && !isGearP()` 추가 안전장치
   - 수정: 기어 raw 매핑(555=P, 629=D) + args[1] 유효성 체크(1-6이면 API 값으로 사용)
-- [ ] **기어 콜백 파라미터 확정** — ADB 재연결 후 `Gear onDataEventChanged()` 로그에서
-  - args[1]이 1=P, 4=D인지(API 값) 아니면 다른 형식인지 확인
-  - R, N raw 값 파악 후 매핑 테이블 완성
-- [ ] **속도/bodywork 리스너 콜백 확인** — `Speed onDataEventChanged()`, `Bodywork onDataEventChanged()` 로그
-  - 속도 args[0] 값이 실제 km/h인지, 다른 raw 형식인지 확인
-  - bodywork args[0]이 powerLevel(0-4)인지, 아니면 다른 이벤트 타입인지 확인
-  - 확인 후 매핑 조정 (VehicleDataProvider.java listenerSpeedKmh / listenerPowerLevel)
+- [x] **기어 콜백 파라미터 확정** — 로그 분석으로 확인
+  - args[0]=featureId(Integer), args[1]=BYDAutoEventValue 객체
+  - BYDAutoEventValue.intValue 필드 reflection으로 추출
+  - D3 raw 기어값: 아직 확인 중 (featureId 692060194, 555745336 교대 패턴 관찰)
+- [ ] **속도 리스너 실차 확인** — `Speed onDataEventChanged()` args 구조 동일 여부 확인
+- [ ] **bodywork 리스너 확인** — bodywork=X 초기화 실패 원인 파악
+- [ ] **기어 BYDAutoEventValue.intValue 추출값 확인** — 실차에서 P/R/N/D 각 단계별 intValue 값 로그 확인
 
 ## Phase 8: ACC OFF 생존 안정성 강화
 
