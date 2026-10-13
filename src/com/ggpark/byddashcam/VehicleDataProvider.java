@@ -51,6 +51,7 @@ public final class VehicleDataProvider {
     private boolean gearIsD5 = false;      // D5(씨라이언7) 기어 매핑: 1=P, 2=R, 3=N, 4=D
     // 리스너 방식으로 받은 값 (registerListener permission 체크 없음)
     private volatile int listenerGearValue = Integer.MIN_VALUE;
+    private volatile int listenerGearFeatureId = Integer.MIN_VALUE; // 마지막 기어 콜백 featureId
     private volatile int listenerSpeedKmh = Integer.MIN_VALUE;   // 속도 리스너 값
     private volatile int listenerPowerLevel = Integer.MIN_VALUE; // bodywork 리스너 값
 
@@ -457,18 +458,25 @@ public final class VehicleDataProvider {
                                 sb.append(")");
                                 Log.d(TAG, sb.toString());
                                 // args[0]=featureId(Integer), args[1]=BYDAutoEventValue
-                                // BYDAutoEventValue.intValue 필드에서 실제 기어값 추출
+                                int fid = (args.length >= 1 && args[0] instanceof Number)
+                                        ? ((Number) args[0]).intValue() : Integer.MIN_VALUE;
                                 Integer extracted = args.length >= 2
                                         ? extractEventInt(args[1]) : null;
                                 if (extracted != null) {
                                     listenerGearValue = extracted;
+                                    listenerGearFeatureId = fid;
                                 } else if (args.length >= 1 && args[0] instanceof Number) {
                                     listenerGearValue = ((Number) args[0]).intValue();
+                                    listenerGearFeatureId = Integer.MIN_VALUE;
+                                }
+                                // featureId+value 변화를 모두 LogBuffer에 기록 (매핑 분석용)
+                                LogBuffer buf = logBuffer;
+                                if (buf != null) {
+                                    buf.append("BYDGear", "fid=" + fid
+                                            + " val=" + (extracted != null ? extracted : "?"));
                                 }
                                 if (!listenerGearFirstReceived) {
                                     listenerGearFirstReceived = true;
-                                    LogBuffer buf = logBuffer;
-                                    if (buf != null) buf.append("BYDGear", "listener첫콜백: " + sb);
                                 }
                             } else if (name.equals("onDataChanged") && args != null
                                     && args.length >= 1) {
@@ -827,6 +835,7 @@ public final class VehicleDataProvider {
                     buf.append("BYDRaw",
                             "speed=" + speedKmh
                             + " gearRaw=" + rawGear
+                            + " gearFid=" + listenerGearFeatureId
                             + " accel=" + acceleratorPercent
                             + " brake=" + brakePercent
                             + " turn=" + (gearBlinkBeltFlags >> 4)
