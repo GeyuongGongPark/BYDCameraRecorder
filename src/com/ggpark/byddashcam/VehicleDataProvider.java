@@ -462,16 +462,15 @@ public final class VehicleDataProvider {
                                         ? ((Number) args[0]).intValue() : Integer.MIN_VALUE;
                                 Integer extracted = args.length >= 2
                                         ? extractEventInt(args[1]) : null;
-                                if (extracted != null) {
+                                // fid=692060194 제외: 기어 위치 아닌 다른 신호 (주행 상태 등)
+                                // 로그 분석으로 확인 — 주행 중 0/1/2를 초당 수회 발생시킴
+                                if (fid != 692060194 && extracted != null) {
                                     listenerGearValue = extracted;
                                     listenerGearFeatureId = fid;
-                                } else if (args.length >= 1 && args[0] instanceof Number) {
-                                    listenerGearValue = ((Number) args[0]).intValue();
-                                    listenerGearFeatureId = Integer.MIN_VALUE;
                                 }
-                                // featureId+value 변화를 모두 LogBuffer에 기록 (매핑 분석용)
+                                // featureId+value 변화를 LogBuffer에 기록
                                 LogBuffer buf = logBuffer;
-                                if (buf != null) {
+                                if (buf != null && fid != 692060194) {
                                     buf.append("BYDGear", "fid=" + fid
                                             + " val=" + (extracted != null ? extracted : "?"));
                                 }
@@ -701,6 +700,7 @@ public final class VehicleDataProvider {
 
             int gearBlinkBeltFlags = 0;
             int rawGearValue = Integer.MIN_VALUE;
+            boolean gearFromPolling = false;
             if (gearDevice == null) {
                 if (!gearNullLogged) {
                     gearNullLogged = true;
@@ -712,6 +712,7 @@ public final class VehicleDataProvider {
                     Object v = methodGetGear.invoke(gearDevice);
                     if (v instanceof Number) {
                         rawGearValue = ((Number) v).intValue();
+                        gearFromPolling = true;
                     }
                 } catch (Exception e) {
                     if (!gearInvokeErrorLogged) {
@@ -737,12 +738,27 @@ public final class VehicleDataProvider {
                 int g = rawGearValue;
                 gearBlinkBeltFlags = 0;
                 if (gearIsD3) {
-                    // D3(돌핀/아토3) getCurrentGear() 매핑: 0=N, 1=R, 2=D, 3=P
-                    // 게터 실패 시 리스너 raw CAN 값(555=P, 629=D)으로 fallback
-                    if (g == 3 || g == 555)       gearBlinkBeltFlags |= 0x01; // P
-                    else if (g == 1)               gearBlinkBeltFlags |= 0x02; // R
-                    else if (g == 0)               gearBlinkBeltFlags |= 0x04; // N
-                    else if (g == 2 || g == 629)   gearBlinkBeltFlags |= 0x08; // D
+                    // D3(돌핀/아토3) featureId 기반 매핑
+                    int gfid = listenerGearFeatureId;
+                    if (gearFromPolling || gfid == 562036753) {
+                        // getCurrentGear() 매핑: 3=P, 1=R, 0=N, 2=D
+                        if (g == 3)      gearBlinkBeltFlags |= 0x01; // P
+                        else if (g == 1) gearBlinkBeltFlags |= 0x02; // R
+                        else if (g == 0) gearBlinkBeltFlags |= 0x04; // N
+                        else if (g == 2) gearBlinkBeltFlags |= 0x08; // D
+                    } else if (gfid == 555745336) {
+                        // getGearboxAutoModeType() 매핑: 1=P, 2=R, 3=N, 4=D
+                        if (g == 1)      gearBlinkBeltFlags |= 0x01; // P
+                        else if (g == 2) gearBlinkBeltFlags |= 0x02; // R
+                        else if (g == 3) gearBlinkBeltFlags |= 0x04; // N
+                        else if (g == 4) gearBlinkBeltFlags |= 0x08; // D
+                    } else {
+                        // 미확인 featureId — raw CAN 값 or getCurrentGear 공용 fallback
+                        if (g == 3 || g == 555)     gearBlinkBeltFlags |= 0x01; // P
+                        else if (g == 1)             gearBlinkBeltFlags |= 0x02; // R
+                        else if (g == 0)             gearBlinkBeltFlags |= 0x04; // N
+                        else if (g == 2 || g == 629) gearBlinkBeltFlags |= 0x08; // D
+                    }
                 } else if (gearIsD5) {
                     // D5(씨라이언7) getGear() 매핑: 1=P, 2=R, 3=N, 4=D
                     if (g == 1)      gearBlinkBeltFlags |= 0x01; // P
