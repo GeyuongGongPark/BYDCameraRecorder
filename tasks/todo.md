@@ -77,10 +77,14 @@
 - [x] **기어 콜백 파라미터 확정** — 로그 분석으로 확인
   - args[0]=featureId(Integer), args[1]=BYDAutoEventValue 객체
   - BYDAutoEventValue.intValue 필드 reflection으로 추출
-  - D3 raw 기어값: 아직 확인 중 (featureId 692060194, 555745336 교대 패턴 관찰)
+  - fid=692060194: 기어 위치 아님, 완전 제외
+  - fid=562036753: getCurrentGear (3=P, 1=R, 0=N, 2=D)
+  - fid=555745336: getGearboxAutoModeType (1=P, 2=R, 3=N, 4=D)
+- [x] **D3 featureId 기반 매핑 분리** — gearFromPolling + featureId 분기 구현
 - [ ] **속도 리스너 실차 확인** — `Speed onDataEventChanged()` args 구조 동일 여부 확인
 - [ ] **bodywork 리스너 확인** — bodywork=X 초기화 실패 원인 파악
-- [ ] **기어 BYDAutoEventValue.intValue 추출값 확인** — 실차에서 P/R/N/D 각 단계별 intValue 값 로그 확인
+- [x] **BYDGearErr getCause() 로깅 추가** — InvocationTargetException 실제 원인 확인용
+- [ ] **실차 기어 오버레이 검증** — v1.0.9.3 설치 후 BYDGearErr 원인 확인 + P/R/N/D 오버레이 정확도 확인
 
 ## Phase 8: ACC OFF 생존 안정성 강화
 
@@ -133,3 +137,49 @@
 - [x] `nextPinAttempts` 만료 항목 정리 추가 (`removeIf(e -> e.getValue() <= now)`)
 - [x] `api/debug/logs` 인증 없음 — **의도된 설계** (URL 토큰이 1차 보호), 되돌림
 - [~] PIN 6자리 + 5초 lockout, 세션 쿠키 HttpOnly/SameSite=Strict, path traversal 방어, constantTimeEquals — 모두 양호
+
+## QA 검증 계획 (화이트박스)
+- [x] 검증 대상/진입점/외부 의존성 및 기존 변경사항 확인
+- [x] Java 본체 단위·통합 성격 테스트 및 전체 APK 빌드 실행
+- [~] Flutter 모바일 정적 분석·테스트 통과, Android APK 빌드는 Gradle 무출력 장기 대기로 중단
+- [x] 핵심 기능별 코드 경로/예외 경로/보안 경계 점검
+- [x] 결과·재현 명령·미검증 영역을 아래 검토 섹션에 기록
+
+## QA 검토 결과 (2026-10-15)
+
+### 통과
+- `bash build.sh`: Java 66개 소스 컴파일, DEX 생성, APK 패키징 및 apksigner v1/v2/v3 검증 통과
+- `flutter analyze`: No issues found
+- `flutter test`: 위젯 스모크 테스트 1건 통과
+- `npm --prefix phone-ui test`: 테스트 파일 1개/테스트 2건 통과
+- `npm --prefix phone-ui run build`: Vite production build 통과
+- 통합 APK `build/byd-dashcam-debug.apk`의 manifest/package/version/권한 및 phone UI asset 포함 확인
+- 코드 경로 검토: PIN lockout·constant-time 비교·세션 쿠키·토큰 prefix·path traversal·HTTP range·SSE/WebSocket·주차 이벤트 상태 전이
+
+### 경고 및 미해결
+- `aapt`: 기본 영어 리소스에 MQTT/Telegram 관련 한국어 번역 키 14개 누락 경고
+- `javac`: Java 8 `-source/-target` obsolete 경고
+- D8: vendor stub에 포함되지 않은 `AVMCamera` callback/`AbsBYDAutoBodyworkListener` 타입 경고
+- Flutter Android APK build: `assembleDebug`가 장시간 무출력 상태여서 중단했으며 APK 산출물 미확인
+- ADB/에뮬레이터: daemon socket 권한 오류로 기동 실패, 설치·런타임·FixtureFrameSource 검증 불가
+- 실차: BYD 기어/속도/bodywork listener, ACC OFF 생존, radar/MCU wake-up, 카메라·GPS 하드웨어 동작 미검증
+
+### 재현 명령
+```bash
+bash build.sh
+flutter analyze && flutter test
+flutter build apk --debug
+npm --prefix phone-ui test
+npm --prefix phone-ui run build
+```
+
+## QA 후속: aapt 고아 번역 키 정리
+
+aapt 경고 14개 — `values-ko/strings.xml`에만 있고 `values/strings.xml`에 없는 키 제거
+
+- [x] 14개 키가 Java 코드에서 실제 참조 여부 확인 — 전부 미사용
+- [x] 미사용 키 14개 `values-ko/strings.xml`에서 제거 (Telegram 4개, MQTT 9개, hint_optional 1개)
+- [x] 빌드 후 aapt 번역 경고 0개 확인
+
+### QA 후속 검토
+- aapt 번역 경고 14개 → 0개로 해소

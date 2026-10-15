@@ -23,6 +23,7 @@
 ### InvocationTargetException.getCause() 필수
 - BYD 메서드 reflection 호출 실패 시 `e.getMessage()`는 null
 - `e.getCause()`로 unwrap해야 실제 SecurityException 메시지 확인 가능
+- LogBuffer에 기록 시 반드시 getCause() unwrap 포함 — 없으면 로그에 "null"만 찍혀 원인 불명
 
 ## 기어 이벤트 콜백 형식 (확인 필요)
 
@@ -146,16 +147,26 @@ Object v = f.get(obj);
 int value = ((Number) v).intValue();
 ```
 
-### 기어 featureId 패턴 (아토3 D3, 실차 관찰)
-- 692060194, 555745336 교대로 나옴 — featureId가 기어 종류마다 다를 수 있음
-- BYDAutoEventValue.intValue에서 실제 기어값(0=N, 1=R, 2=D, 3=P?) 확인 필요
-- **TODO**: 실차에서 P/D/N/R 전환 시 intValue 값 확인
+### 기어 featureId 패턴 (아토3 D3, 실차 로그 확인)
+- fid=692060194: 기어 위치 아님 — 주행 상태 신호, 0/1/2를 초당 수회 발생 → 완전 제외
+- fid=562036753: getCurrentGear() — 3=P, 1=R, 0=N, 2=D (P단에서 val=3 확인)
+- fid=555745336: getGearboxAutoModeType() — 1=P, 2=R, 3=N, 4=D (P단에서 val=1 확인)
+- polling 성공(gearFromPolling=true) 시 항상 getCurrentGear 매핑 사용
+- featureId 미확인 시 raw CAN fallback(555=P, 629=D) 사용
 
 ### AndroidManifest.xml versionName 관리
 - versionName은 항상 GitHub 태그와 일치시킬 것
 - 불일치 시 UpdateChecker가 매번 업데이트 알림 표시
 - 현재 기준: versionCode=18, versionName="1.0.8"
 - 다음 릴리스 전에 반드시 versionName 업데이트 + 커밋
+
+## 리소스 관리
+
+### 기능 제거 시 번역 키도 함께 제거할 것
+- Java 코드에서 기능을 제거해도 `values-ko/strings.xml` 등 번역 파일에 키가 잔존할 수 있음
+- aapt가 `values/strings.xml`(기본)에 없고 `values-ko`에만 있는 키를 경고로 잡아냄
+- 기능 제거 커밋 시 체크리스트: `[ ] 관련 번역 키 values-ko/strings.xml에서 제거`
+- 확인 방법: `bash build.sh 2>&1 | grep "^warning: string"`
 
 ## 빌드 환경
 
