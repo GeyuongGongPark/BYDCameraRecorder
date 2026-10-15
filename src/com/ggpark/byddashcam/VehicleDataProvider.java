@@ -719,8 +719,12 @@ public final class VehicleDataProvider {
                         gearInvokeErrorLogged = true;
                         LogBuffer buf = logBuffer;
                         if (buf != null) {
-                            buf.append("BYDGearErr", e.getClass().getSimpleName()
-                                    + ": " + e.getMessage());
+                            Throwable cause = (e instanceof java.lang.reflect.InvocationTargetException)
+                                    ? e.getCause() : e;
+                            String msg = (cause != null)
+                                    ? cause.getClass().getSimpleName() + ": " + cause.getMessage()
+                                    : e.getClass().getSimpleName();
+                            buf.append("BYDGearErr", msg);
                         }
                         Log.w(TAG, "Gear invoke failed", e);
                     }
